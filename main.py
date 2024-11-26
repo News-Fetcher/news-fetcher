@@ -16,7 +16,7 @@ def extract_domain(url):
     return "unknown_domain"
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 client = OpenAI()
 
@@ -46,6 +46,14 @@ for website in news_websites:
         logger.info(f"Crawling website: {website}")
         crawl_status = app.crawl_url(
             website,
+            includePaths = [ 
+              'investigates/*', # reuters
+              'world/*', # reuters
+              'markets/*' # reuters
+              'business/*' # reuters
+              'article/*' # ap
+              'news/*' # cointelegraph
+            ],
             params={
                 'limit': 7,
                 'scrapeOptions': {'formats': ['markdown', 'html']}
