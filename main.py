@@ -47,7 +47,7 @@ for website in news_websites:
         crawl_status = app.crawl_url(
             website,
             params={
-                'limit': 10,
+                'limit': 1,
                 'scrapeOptions': {'formats': ['markdown', 'html']}
             },
             poll_interval=1
