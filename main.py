@@ -184,15 +184,15 @@ except Exception as e:
 # Commit the final podcast to GitHub
 logger.info("Committing the final podcast to GitHub...")
 
-GIT_ACCESS_TOKEN = os.getenv("GIT_ACCESS_TOKEN")
-if not GIT_ACCESS_TOKEN:
+GH_ACCESS_TOKEN = os.getenv("GH_ACCESS_TOKEN")
+if not GH_ACCESS_TOKEN:
     raise ValueError("GitHub access token not set in environment variables.")
 
 REPO_NAME = "nagisa77/posts"
 COMMIT_FILE_PATH = f"podcasts/{today_date}.mp3"
 
 try:
-    g = Github(GIT_ACCESS_TOKEN)
+    g = Github(GH_ACCESS_TOKEN)
     repo = g.get_repo(REPO_NAME)
 
     # Read the podcast file
