@@ -2,7 +2,7 @@ name: Podcast Generator Workflow
 
 on:
   schedule:
-    - cron: "0 2 * * *" # 每天凌晨 2 点运行
+    - cron: "0 8 * * *" # 每天凌晨 2 点运行
   workflow_dispatch: # 手动触发
 
 jobs:
@@ -26,12 +26,10 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get install -y ffmpeg
 
-      - name: Set environment variables
+      - name: Run Podcast Generator
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_ACCESS_TOKEN }}
-        run: echo "Environment variables set."
-
-      - name: Run Podcast Generator
         run: python main.py
+    environment: Tim-s-News # 显式指定环境
