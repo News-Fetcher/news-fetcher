@@ -46,17 +46,17 @@ for website in news_websites:
         logger.info(f"Crawling website: {website}")
         crawl_status = app.crawl_url(
             website,
-            includePaths = [ 
-              'investigates/*', # reuters
-              'world/*', # reuters
-              'markets/*' # reuters
-              'business/*' # reuters
-              'article/*' # ap
-              'news/*' # cointelegraph
-            ],
             params={
                 'limit': 7,
-                'scrapeOptions': {'formats': ['markdown', 'html']}
+                'scrapeOptions': {'formats': ['markdown', 'html']},
+                'includePaths': [ 
+                  'investigates/*', # reuters
+                  'world/*', # reuters
+                  'markets/*' # reuters
+                  'business/*' # reuters
+                  'article/*' # ap
+                  'news/*' # cointelegraph
+                ],
             },
             poll_interval=1
         )
