@@ -30,6 +30,6 @@ jobs:
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_ACCESS_TOKEN }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
         run: python main.py
     environment: Tim-s-News # 显式指定环境
