@@ -26,9 +26,10 @@ app = FirecrawlApp(api_key=api_key_firecrawl)
 
 # List of news websites to crawl
 news_websites = [
-  'https://www.reuters.com',
-  'https://cointelegraph.com',
-  'https://apnews.com',
+#   'https://www.reuters.com',
+#   'https://cointelegraph.com',
+#   'https://cn.nytimes.com',
+#   'https://apnews.com',
 ]
 
 # Folder for saving audio files
@@ -51,11 +52,14 @@ for website in news_websites:
                 'scrapeOptions': {'formats': ['markdown', 'html']},
                 'includePaths': [ 
                   'investigates/*', # reuters
-                  'world/*', # reuters
-                  'markets/*' # reuters
-                  'business/*' # reuters
-                  'article/*' # ap
-                  'news/*' # cointelegraph
+                  'world/*', # reuters # newyork times
+                  'markets/*', # reuters
+                  'business/*', # reuters
+                  'article/*', # ap
+                  'news/*', # cointelegraph
+                  'technology/*', # newyork times
+                  'culture/*', # newyork times
+                  'opinion/*', # newyork times
                 ],
             },
             poll_interval=1
@@ -107,7 +111,8 @@ for website in news_websites:
 
                     tts_response = client.audio.speech.create(
                         model="tts-1",
-                        voice="alloy",
+                        voice="echo",
+                        speed=1.3,
                         input=article_summary
                     )
                     tts_response.stream_to_file(speech_file_path)
@@ -152,7 +157,8 @@ try:
     intro_audio_path = Path(output_folder) / "intro.mp3"
     intro_tts_response = client.audio.speech.create(
         model="tts-1",
-        voice="alloy",
+        voice="echo",
+        speed=1.3,
         input=intro_summary
     )
     intro_tts_response.stream_to_file(intro_audio_path)
