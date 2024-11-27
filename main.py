@@ -26,10 +26,10 @@ app = FirecrawlApp(api_key=api_key_firecrawl)
 
 # List of news websites to crawl
 news_websites = [
-#   'https://www.reuters.com',
-#   'https://cointelegraph.com',
-#   'https://cn.nytimes.com',
-#   'https://apnews.com',
+  'https://www.reuters.com',
+  'https://cointelegraph.com',
+  'https://cn.nytimes.com',
+  'https://apnews.com',
 ]
 
 # Folder for saving audio files
