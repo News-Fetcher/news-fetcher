@@ -23,59 +23,80 @@ This script automates the process of crawling news websites, summarizing article
    ```bash
    git clone https://github.com/nagisa77/news-fetcher.git
    cd news-fetcher
+	 ```
 
-	2.	Install dependencies:
+2.	Install dependencies:
 
-pip install -r requirements.txt
+	  ```
+	  pip install -r requirements.txt
+	  ```
 
 
-	3.	Install FFmpeg (if not already installed):
+3.	Install FFmpeg (if not already installed):
 	•	macOS: brew install ffmpeg
 	•	Ubuntu: sudo apt install ffmpeg
 	•	Windows: Download and install FFmpeg from FFmpeg.org.
 
-Setup
+## Setup
 
-	1.	Set up environment variables:
+1.	Set up environment variables:
+
 	•	FIRECRAWL_API_KEY: Your Firecrawl API key.
+
 	•	GH_ACCESS_TOKEN: Your GitHub access token.
-	2.	Update the script:
+
+2.	Update the script:
+
 	•	Replace news_websites with the desired list of news website URLs.
+
 	•	Ensure the REPO_NAME variable is set to nagisa77/news-fetcher.
 
-Usage
+## Usage
 
 Run the script:
 
+```
 python news_podcast_generator.py
+```
 
 The script will:
-	1.	Crawl the specified news websites for articles.
-	2.	Generate summaries and convert them into audio files.
-	3.	Combine all audio files into a single MP3 podcast.
-	4.	Commit the podcast to your GitHub repository.
 
-Output
+1.	Crawl the specified news websites for articles.
 
-	•	Podcasts are saved locally in the podcast_audio folder.
-	•	The final merged podcast is committed to the podcasts folder in the specified GitHub repository.
+2.	Generate summaries and convert them into audio files.
 
-Example
+3.	Combine all audio files into a single MP3 podcast.
+
+4.	Commit the podcast to your GitHub repository.
+
+
+## Output
+
+•	Podcasts are saved locally in the podcast_audio folder.
+
+•	The final merged podcast is committed to the podcasts folder in the specified GitHub repository.
+
+## Example
 
 The podcast for today’s news will be saved locally as:
 
+```
 podcast_audio/2024-11-28.mp3
+```
 
 and committed to GitHub at:
 
+```
 podcasts/2024-11-28.mp3
+```
 
-Notes
+## Notes
 
-	•	Ensure that your GitHub token has the appropriate permissions to create and push files to the repository.
-	•	Configure limit and includePaths in the FirecrawlApp parameters to control the number and type of articles crawled.
+•	Ensure that your GitHub token has the appropriate permissions to create and push files to the repository.
 
-License
+•	Configure limit and includePaths in the FirecrawlApp parameters to control the number and type of articles crawled.
+
+## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
 
