@@ -38,13 +38,38 @@ if not api_key_firecrawl:
     raise ValueError("Firecrawl API key not set in environment variables.")
 app = FirecrawlApp(api_key=api_key_firecrawl)
 
-# List of news websites to crawl
-news_websites = [
-    'https://www.reuters.com',
-    # 'https://cointelegraph.com',
-    # 'https://apnews.com',
-    # 'https://www.chaincatcher.com',
-]
+# Custom rules for each website
+news_websites = {
+    'https://www.reuters.com': {
+        'limit': 10,
+        'includePaths': [
+            'investigates/*',
+            'world/*',
+            'markets/*',
+            'business/*',
+            'article/*',
+        ]
+    },
+    'https://cointelegraph.com': {
+        'limit': 10,
+        'includePaths': [
+            'news/*',
+            # 'technology/*',
+        ]
+    },
+    'https://apnews.com': {
+        'limit': 7,
+        'includePaths': [
+            'article/*',
+        ]
+    },
+    'https://www.chaincatcher.com': {
+        'limit': 7,
+        'includePaths': [
+            'article/*',
+        ]
+    }
+}
 
 # Folder for saving audio files
 output_folder = "podcast_audio"
@@ -56,25 +81,15 @@ logger.info("Starting to crawl, summarize, and generate audio for news websites.
 mp3_files = []
 all_summaries = []
 
-for website in news_websites:
+for website, rules in news_websites.items():
     try:
-        logger.info(f"Crawling website: {website}")
+        logger.info(f"Crawling website: {website} with rules {rules}")
         crawl_status = app.crawl_url(
             website,
             params={
-                'limit': 1,
+                'limit': rules['limit'],
                 'scrapeOptions': {'formats': ['markdown', 'html']},
-                'includePaths': [ 
-                  'investigates/*', # reuters
-                  'world/*', # reuters # newyork times
-                  'markets/*', # reuters
-                  'business/*', # reuters
-                  'article/*', # ap
-                  'news/*', # cointelegraph
-                  'technology/*', # newyork times
-                  'culture/*', # newyork times
-                  'opinion/*', # newyork times
-                ],
+                'includePaths': rules['includePaths'],
             },
             poll_interval=1
         )
