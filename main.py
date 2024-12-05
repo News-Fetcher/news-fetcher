@@ -38,36 +38,39 @@ if not api_key_firecrawl:
     raise ValueError("Firecrawl API key not set in environment variables.")
 app = FirecrawlApp(api_key=api_key_firecrawl)
 
+reuters_date = datetime.now().strftime("%Y-%m-%d")
+coindesk_date = datetime.now().strftime("/%Y/%m/%d")
+
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 10,
+        'limit': 14,
         'includePaths': [
-            'investigates/*',
-            'world/*',
-            'markets/*',
-            'business/*',
-            'article/*',
-        ]
+            f'{reuters_date}',
+        ],
+        'excludePaths': []
     },
-    'https://cointelegraph.com': {
-        'limit': 10,
+    # 'https://cointelegraph.com': {
+    #     'limit': 7,
+    #     'includePaths': [
+    #         'news/*',
+    #         # 'technology/*',
+    #     ],
+    #     'excludePaths': []
+    # },
+    # 'https://apnews.com': {
+    #     'limit': 7,
+    #     'includePaths': [
+    #         # 'article',
+    #     ],
+    #     'excludePaths': []
+    # },
+    'https://www.coindesk.com': {
+        'limit': 14,
         'includePaths': [
-            'news/*',
-            # 'technology/*',
-        ]
-    },
-    'https://apnews.com': {
-        'limit': 7,
-        'includePaths': [
-            'article/*',
-        ]
-    },
-    'https://www.chaincatcher.com': {
-        'limit': 7,
-        'includePaths': [
-            'article/*',
-        ]
+            f'{coindesk_date}',
+        ],
+        'excludePaths': []
     }
 }
 
@@ -90,9 +93,11 @@ for website, rules in news_websites.items():
                 'limit': rules['limit'],
                 'scrapeOptions': {'formats': ['markdown', 'html']},
                 'includePaths': rules['includePaths'],
+                'excludePaths': rules['excludePaths'],
             },
             poll_interval=1
         )
+
         news_articles = crawl_status.get('data', [])
 
         if not news_articles:
@@ -101,8 +106,15 @@ for website, rules in news_websites.items():
 
         logger.info(f"Found {len(news_articles)} articles from {website}.")
 
+        for article in news_articles:
+            logger.info(f"Article URL: {article.get('metadata', {}).get('sourceURL', '')}")
+
         # Summarize and generate audio for each article
         for idx, article in enumerate(news_articles):
+            if (article.get('metadata', {}).get('sourceURL', '') == website):
+                logger.info(f"Skipping article {idx + 1} from {website} because it's the same as the website URL.")
+                continue
+
             markdown_content = article.get('markdown', '')
             if markdown_content:
                 single_article_prompt = f"""
@@ -111,7 +123,10 @@ for website, rules in news_websites.items():
                 Article Content:
                 {markdown_content}
                 """
-                logger.info(f"Summarizing article {idx + 1} from {website}...")
+                meta_data = article.get('metadata', {})
+                title = meta_data.get('title', '')
+                url = meta_data.get('sourceURL', '')
+                logger.info(f"Summarizing article {idx + 1} from {website} with title: {title} and URL: {url}...")
                 try:
                     article_response = client.chat.completions.create(
                         model="gpt-4o-mini-2024-07-18",
