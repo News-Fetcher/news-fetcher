@@ -228,10 +228,12 @@ try:
 
     intro_json = intro_response.choices[0].message.content
     logger.info(f"Introduction generated:\n{intro_json}")
-
-    opening = intro_json.get('opening', '')
-    title = intro_json.get('title', '')
-    description = intro_json.get('description', '')
+    
+    intro_data = json.loads(intro_json)
+    
+    opening = intro_data.get('opening', '')
+    title = intro_data.get('title', '')
+    description = intro_data.get('description', '')
 
     intro_audio_path = Path(output_folder) / f"{title}.mp3"
     intro_tts_response = client.audio.speech.create(
