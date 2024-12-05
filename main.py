@@ -45,7 +45,7 @@ coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 2,
+        'limit': 14,
         'includePaths': [
             f'{reuters_date}',
         ],
@@ -70,7 +70,7 @@ news_websites = {
     #     'excludePaths': []
     # },
     'https://www.coindesk.com': {
-        'limit': 2,
+        'limit': 14,
         'includePaths': [
             f'{coindesk_date}',
         ],
