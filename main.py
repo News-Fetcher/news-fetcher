@@ -7,6 +7,7 @@ from openai import OpenAI
 from firecrawl import FirecrawlApp
 from datetime import datetime
 from github import Github
+import json
 import time
 
 # Extract domain function
@@ -44,11 +45,14 @@ coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 14,
+        'limit': 2,
         'includePaths': [
             f'{reuters_date}',
         ],
-        'excludePaths': []
+        'excludePaths': [
+            'wrapup',
+            'podcasts',
+        ]
     },
     # 'https://cointelegraph.com': {
     #     'limit': 7,
@@ -66,7 +70,7 @@ news_websites = {
     #     'excludePaths': []
     # },
     'https://www.coindesk.com': {
-        'limit': 14,
+        'limit': 2,
         'includePaths': [
             f'{coindesk_date}',
         ],
@@ -117,15 +121,19 @@ for website, rules in news_websites.items():
 
             markdown_content = article.get('markdown', '')
             if markdown_content:
+                meta_data = article.get('metadata', {})
+                title = meta_data.get('title', '')
+                url = meta_data.get('sourceURL', '')
                 single_article_prompt = f"""
                 Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:
+
+                Article Title: {title}
+                Article URL: {url}
 
                 Article Content:
                 {markdown_content}
                 """
-                meta_data = article.get('metadata', {})
-                title = meta_data.get('title', '')
-                url = meta_data.get('sourceURL', '')
+
                 logger.info(f"Summarizing article {idx + 1} from {website} with title: {title} and URL: {url}...")
                 try:
                     article_response = client.chat.completions.create(
@@ -133,7 +141,11 @@ for website, rules in news_websites.items():
                         messages=[
                             {
                               "role": "system",
-                              "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。在回答问题时，使用简洁、有条理、流畅且富有感染力的语言风格。确保语气专业、清晰且富有吸引力，适合公众广播或播客节目。"
+                              "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。 \
+                                        在回答问题时，使用简洁、有条理、流畅且富有感染力的语言风格。 \
+                                        确保语气专业、清晰且富有吸引力，适合公众广播或播客节目。\
+                                        总结新闻的时候，先说类似“接下来的这则（来自xxx网站）新闻讲的是/描述了...” 之类的，\
+                                        引出接下来的内容, "
                             }, 
                             {
                                 "role": "user",
@@ -170,11 +182,34 @@ for website, rules in news_websites.items():
 
 # Generate podcast introduction
 logger.info("Generating introduction for the podcast...")
-try:
-    intro_prompt = f"""
-    Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and summarize the main topics:
+title = ""
 
-    Summaries:
+try:
+    example_json = {
+        "opening": "",
+        "title": "",
+        "description": ""
+    }
+    intro_prompt = f"""
+    Please follow the following instructions to generate a podcast introduction:
+    
+    the opening:
+    Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and summarize the main topics
+    the important thing is need to be detailed, not too short
+
+    the title:
+    Provide a podcast title
+
+    description:
+    Provide a one-sentence description for the podcast  
+
+    Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
+
+    {json.dumps(example_json)}
+
+    This JSON provides a structured format for integrating the introduction, title, and description into your script or further processes.
+
+    So the summaries is:
     {chr(10).join(all_summaries)}
     """
     intro_response = client.chat.completions.create(
@@ -182,7 +217,7 @@ try:
         messages=[
             {
                 "role": "system",
-                "content": "你是一位新闻播音员，为今日新闻播客生成暖心开场白，并引导进入第一个新闻。"
+                "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"
             },
             {
                 "role": "user",
@@ -190,15 +225,20 @@ try:
             }
         ]
     )
-    intro_summary = intro_response.choices[0].message.content
-    logger.info(f"Introduction generated:\n{intro_summary}")
 
-    intro_audio_path = Path(output_folder) / "intro.mp3"
+    intro_json = intro_response.choices[0].message.content
+    logger.info(f"Introduction generated:\n{intro_json}")
+
+    opening = intro_json.get('opening', '')
+    title = intro_json.get('title', '')
+    description = intro_json.get('description', '')
+
+    intro_audio_path = Path(output_folder) / f"{title}.mp3"
     intro_tts_response = client.audio.speech.create(
         model="tts-1",
         voice="echo",
         speed=1.3,
-        input=intro_summary
+        input=opening
     )
     intro_tts_response.stream_to_file(intro_audio_path)
     mp3_files.insert(0, intro_audio_path)
@@ -233,7 +273,7 @@ if not GH_ACCESS_TOKEN:
     raise ValueError("GitHub access token not set in environment variables.")
 
 REPO_NAME = "nagisa77/posts"
-COMMIT_FILE_PATH = f"podcasts/{today_date}.mp3"
+COMMIT_FILE_PATH = f"podcasts/{today_date}-{title}.mp3"
 
 try:
     g = Github(GH_ACCESS_TOKEN)
