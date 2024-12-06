@@ -9,6 +9,7 @@ from datetime import datetime
 from github import Github
 import json
 import time
+import re
 
 # Extract domain function
 def extract_domain(url):
@@ -227,6 +228,12 @@ try:
     )
 
     intro_json = intro_response.choices[0].message.content
+    cleaned_json = re.search(r"json(.*?)", intro_json, re.DOTALL)
+    if cleaned_json:
+        intro_json = cleaned_json.group(1).strip()  # 提取并清除多余的空白字符
+    else:
+        intro_json = intro_json.strip()  # 如果没有匹配到，就保留原内容
+
     logger.info(f"Introduction generated:\n{intro_json}")
     
     intro_data = json.loads(intro_json)
