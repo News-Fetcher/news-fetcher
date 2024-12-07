@@ -80,7 +80,7 @@ coindesk_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("/%Y/
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 14,
+        'limit': 24,
         'includePaths': [
             f'{reuters_date}',
             f'{reuters_date_yesterday}',
@@ -107,7 +107,7 @@ news_websites = {
     #     'excludePaths': []
     # },
     'https://www.coindesk.com': {
-        'limit': 14,
+        'limit': 24,
         'includePaths': [
             f'{coindesk_date}',
             f'{coindesk_date_yesterday}',
