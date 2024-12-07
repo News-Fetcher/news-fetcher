@@ -2,3 +2,4 @@ openai
 pydub
 firecrawl
 pygithub
+firebase_admin
