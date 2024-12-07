@@ -5,11 +5,33 @@ from pathlib import Path
 from pydub import AudioSegment
 from openai import OpenAI
 from firecrawl import FirecrawlApp
-from datetime import datetime
+from datetime import datetime, timedelta
 from github import Github
 import json
 import time
 import re
+import firebase_admin
+from firebase_admin import credentials, db
+
+# Check and update URLs in Firebase
+def is_url_fetched(url):
+    try:
+        ref = db.reference("fetched_urls")
+        fetched_urls = ref.get() or []  # Get existing URLs or initialize with an empty list
+        return url in fetched_urls
+    except Exception as e:
+        logger.error(f"Error checking URL in Firebase: {e}")
+        return False
+
+def add_url_to_fetched(url):
+    try:
+        ref = db.reference("fetched_urls")
+        fetched_urls = ref.get() or []  # Get existing URLs or initialize with an empty list
+        if url not in fetched_urls:
+            fetched_urls.append(url)
+            ref.set(fetched_urls)  # Update Firebase with the new list
+    except Exception as e:
+        logger.error(f"Error adding URL to Firebase: {e}")
 
 # Extract domain function
 def extract_domain(url):
@@ -28,10 +50,18 @@ def retry_github_action(action, max_retries=3):
                 time.sleep(2 ** attempt)
             else:
                 raise e
-
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
+
+# check serviceAccountKey exists
+if not os.path.exists("./serviceAccountKey.json"):
+    raise ValueError("serviceAccountKey.json not found in the current directory.")  
+
+cred = credentials.Certificate("./serviceAccountKey.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app'
+})
 
 # Initialize OpenAI and Firecrawl clients
 client = OpenAI()
@@ -41,7 +71,11 @@ if not api_key_firecrawl:
 app = FirecrawlApp(api_key=api_key_firecrawl)
 
 reuters_date = datetime.now().strftime("%Y-%m-%d")
+reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+reuters_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
 coindesk_date = datetime.now().strftime("/%Y/%m/%d")
+coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
+coindesk_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("/%Y/%m/%d")
 
 # Custom rules for each website
 news_websites = {
@@ -49,6 +83,8 @@ news_websites = {
         'limit': 14,
         'includePaths': [
             f'{reuters_date}',
+            f'{reuters_date_yesterday}',
+            # f'{reuters_date_two_days_ago}',
         ],
         'excludePaths': [
             'wrapup',
@@ -74,6 +110,8 @@ news_websites = {
         'limit': 14,
         'includePaths': [
             f'{coindesk_date}',
+            f'{coindesk_date_yesterday}',
+            # f'{coindesk_date_two_days_ago}',
         ],
         'excludePaths': []
     }
@@ -116,8 +154,13 @@ for website, rules in news_websites.items():
 
         # Summarize and generate audio for each article
         for idx, article in enumerate(news_articles):
-            if (article.get('metadata', {}).get('sourceURL', '') == website):
+            url = article.get('metadata', {}).get('sourceURL', '')
+            if (url == website):
                 logger.info(f"Skipping article {idx + 1} from {website} because it's the same as the website URL.")
+                continue
+
+            if is_url_fetched(url):
+                logger.info(f"Article {idx + 1} already fetched, skipping: {url}")
                 continue
 
             markdown_content = article.get('markdown', '')
@@ -158,6 +201,9 @@ for website, rules in news_websites.items():
                     logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
 
                     all_summaries.append(article_summary)
+
+                    # Mark the URL as fetched
+                    add_url_to_fetched(url)
 
                     # Generate TTS audio
                     domain = extract_domain(website)
