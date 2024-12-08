@@ -11,7 +11,28 @@ import json
 import time
 import re
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, db, storage
+
+# Generate signed URL
+def generate_signed_url(bucket_name, blob_name, expiration_minutes=60):
+    """Generate a signed URL for a file in Google Cloud Storage."""
+    try:
+        # Initialize Google Cloud Storage client
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        # Generate the signed URL
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(minutes=expiration_minutes),
+            method="GET"
+        )
+        logger.info(f"Signed URL generated: {url}")
+        return url
+    except Exception as e:
+        logger.error(f"Error generating signed URL: {e}")
+        return None
 
 # Check and update URLs in Firebase
 def is_url_fetched(url):
@@ -40,6 +61,17 @@ def extract_domain(url):
         return match.group(1)
     return "unknown_domain"
 
+# Upload final podcast to Firebase Storage
+def upload_to_firebase_storage(local_file_path, storage_path):
+    bucket = storage.bucket()
+    try:
+        blob = bucket.blob(storage_path)
+        blob.upload_from_filename(local_file_path)
+        logger.info(f"File uploaded to Firebase Storage: {storage_path}")
+        return blob.public_url  # Return public URL of the file
+    except Exception as e:
+        logger.error(f"Error uploading file to Firebase Storage: {e}")
+        return None
 # Retry decorator for GitHub actions
 def retry_github_action(action, max_retries=3):
     for attempt in range(max_retries):
@@ -60,7 +92,8 @@ if not os.path.exists("./serviceAccountKey.json"):
 
 cred = credentials.Certificate("./serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app'
+    'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app',
+    'storageBucket': 'news-fetcher-platform.firebasestorage.app'
 })
 
 # Initialize OpenAI and Firecrawl clients
@@ -80,7 +113,7 @@ coindesk_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("/%Y/
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 14,
+        'limit': 2,
         'includePaths': [
             f'{reuters_date}',
             f'{reuters_date_yesterday}',
@@ -107,7 +140,7 @@ news_websites = {
     #     'excludePaths': []
     # },
     'https://www.coindesk.com': {
-        'limit': 14,
+        'limit': 2,
         'includePaths': [
             f'{coindesk_date}',
             f'{coindesk_date_yesterday}',
@@ -298,7 +331,7 @@ try:
     title = intro_data.get('title', '今日新闻播客News~')
     description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
 
-    intro_audio_path = Path(output_folder) / f"{title}.mp3"
+    intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
     intro_tts_response = client.audio.speech.create(
         model="tts-1",
         voice="echo",
@@ -315,7 +348,7 @@ except Exception as e:
 # Merge audio files into a single podcast
 logger.info("Merging all audio files into a final podcast...")
 today_date = datetime.now().strftime("%Y-%m-%d")
-final_podcast = Path(output_folder) / f"{today_date}.mp3"
+final_podcast = Path(output_folder) / f"{today_date}_{title}.mp3"
 
 try:
     if mp3_files:
@@ -379,3 +412,25 @@ try:
 
 except Exception as e:
     logger.error(f"Error committing podcast to GitHub: {e}")
+
+
+try:
+    if mp3_files:
+        combined_audio = AudioSegment.from_file(mp3_files[0])
+        for mp3_file in mp3_files[1:]:
+            combined_audio += AudioSegment.from_file(mp3_file)
+
+        combined_audio.export(final_podcast, format="mp3")
+        logger.info(f"Final podcast saved as: {final_podcast}")
+
+        # 上传到 Firebase Storage
+        storage_file_path = f"podcasts/{today_date}-{title}.mp3"
+        firebase_url = upload_to_firebase_storage(final_podcast, storage_file_path)
+
+        if firebase_url:
+            logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
+
+    else:
+        logger.warning("No audio files were generated to merge.")
+except Exception as e:
+    logger.error(f"Error combining MP3 files: {e}")
