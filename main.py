@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import hashlib
 from pathlib import Path
 from pydub import AudioSegment
 from openai import OpenAI
@@ -9,9 +10,57 @@ from datetime import datetime, timedelta
 from github import Github
 import json
 import time
-import re
 import firebase_admin
 from firebase_admin import credentials, db, storage
+
+# Generate SHA256 hash
+def calculate_sha256(file_path):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+# Record metadata to Firebase Realtime Database
+def record_metadata_to_firebase(title, description, sha256):
+    try:
+        ref = db.reference("podcasts")
+        existing_data = ref.get() or []  # Get existing data or initialize as an empty list
+
+        # Ensure the data is in list format
+        if isinstance(existing_data, dict):  
+            existing_data = list(existing_data.values())
+
+        metadata = {
+            "title": title,
+            "description": description,
+            "sha256": sha256,
+        }
+
+        # Append the new metadata to the list
+        existing_data.append(metadata)
+        ref.set(existing_data)  # Save the updated list back to the database
+        logger.info(f"Metadata recorded to Firebase as array: {metadata}")
+    except Exception as e:
+        logger.error(f"Error recording metadata to Firebase: {e}")
+
+# Upload final podcast to Firebase Storage with SHA256 as filename
+def upload_to_firebase_storage(local_file_path, title, description):
+    try:
+        bucket = storage.bucket()
+        sha256_hash = calculate_sha256(local_file_path)
+        storage_path = f"podcasts/{sha256_hash}.mp3"
+
+        blob = bucket.blob(storage_path)
+        blob.upload_from_filename(local_file_path)
+        logger.info(f"File uploaded to Firebase Storage: {storage_path}")
+
+        record_metadata_to_firebase(title, description, sha256_hash)
+
+        return sha256_hash, blob.public_url  # Return SHA256 hash and public URL of the file
+    except Exception as e:
+        logger.error(f"Error uploading file to Firebase Storage: {e}")
+        return None, None
 
 # Generate signed URL
 def generate_signed_url(bucket_name, blob_name, expiration_minutes=60):
@@ -61,17 +110,6 @@ def extract_domain(url):
         return match.group(1)
     return "unknown_domain"
 
-# Upload final podcast to Firebase Storage
-def upload_to_firebase_storage(local_file_path, storage_path):
-    bucket = storage.bucket()
-    try:
-        blob = bucket.blob(storage_path)
-        blob.upload_from_filename(local_file_path)
-        logger.info(f"File uploaded to Firebase Storage: {storage_path}")
-        return blob.public_url  # Return public URL of the file
-    except Exception as e:
-        logger.error(f"Error uploading file to Firebase Storage: {e}")
-        return None
 # Retry decorator for GitHub actions
 def retry_github_action(action, max_retries=3):
     for attempt in range(max_retries):
@@ -82,6 +120,7 @@ def retry_github_action(action, max_retries=3):
                 time.sleep(2 ** attempt)
             else:
                 raise e
+                
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -113,7 +152,7 @@ coindesk_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("/%Y/
 # Custom rules for each website
 news_websites = {
     'https://www.reuters.com': {
-        'limit': 2,
+        'limit': 24,
         'includePaths': [
             f'{reuters_date}',
             f'{reuters_date_yesterday}',
@@ -140,7 +179,7 @@ news_websites = {
     #     'excludePaths': []
     # },
     'https://www.coindesk.com': {
-        'limit': 2,
+        'limit': 24,
         'includePaths': [
             f'{coindesk_date}',
             f'{coindesk_date_yesterday}',
@@ -348,7 +387,8 @@ except Exception as e:
 # Merge audio files into a single podcast
 logger.info("Merging all audio files into a final podcast...")
 today_date = datetime.now().strftime("%Y-%m-%d")
-final_podcast = Path(output_folder) / f"{today_date}_{title}.mp3"
+podcast_name = f"{today_date}_{title}.mp3"
+final_podcast = Path(output_folder) / podcast_name
 
 try:
     if mp3_files:
@@ -371,7 +411,7 @@ if not GH_ACCESS_TOKEN:
     raise ValueError("GitHub access token not set in environment variables.")
 
 REPO_NAME = "nagisa77/posts"
-COMMIT_FILE_PATH = f"podcasts/{today_date}-{title}.mp3"
+COMMIT_FILE_PATH = f"podcasts/{podcast_name}"
 
 try:
     g = Github(GH_ACCESS_TOKEN)
@@ -424,8 +464,7 @@ try:
         logger.info(f"Final podcast saved as: {final_podcast}")
 
         # 上传到 Firebase Storage
-        storage_file_path = f"podcasts/{today_date}-{title}.mp3"
-        firebase_url = upload_to_firebase_storage(final_podcast, storage_file_path)
+        firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
 
         if firebase_url:
             logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
