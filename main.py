@@ -274,19 +274,29 @@ try:
     )
 
     intro_json = intro_response.choices[0].message.content
-    cleaned_json = re.search(r"json(.*?)", intro_json, re.DOTALL)
-    if cleaned_json:
-        intro_json = cleaned_json.group(1).strip()  # 提取并清除多余的空白字符
-    else:
-        intro_json = intro_json.strip()  # 如果没有匹配到，就保留原内容
-
     logger.info(f"Introduction generated:\n{intro_json}")
+
+    # 匹配不同的可能情况
+    if intro_json.strip().startswith("{") and intro_json.strip().endswith("}"):
+        # Case 1: 直接是 JSON 数据
+        cleaned_json = intro_json.strip()
+    elif "```json" in intro_json:
+        # Case 2: ```json 开头的 JSON 数据
+        match = re.search(r"```json(.*?)```", intro_json, re.DOTALL)
+        cleaned_json = match.group(1).strip() if match else intro_json.strip()
+    elif "```" in intro_json:
+        # Case 3: ``` 开头的 JSON 数据
+        match = re.search(r"```(.*?)```", intro_json, re.DOTALL)
+        cleaned_json = match.group(1).strip() if match else intro_json.strip()
+    else:
+        # 如果没有匹配到特定情况，保留原始内容
+        cleaned_json = intro_json.strip()
     
-    intro_data = json.loads(intro_json)
+    intro_data = json.loads(cleaned_json)
     
-    opening = intro_data.get('opening', '')
-    title = intro_data.get('title', '')
-    description = intro_data.get('description', '')
+    opening = intro_data.get('opening', '欢迎收听今天的新闻播客，我们将为您带来最新的新闻动态。')
+    title = intro_data.get('title', '今日新闻播客News~')
+    description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
 
     intro_audio_path = Path(output_folder) / f"{title}.mp3"
     intro_tts_response = client.audio.speech.create(
