@@ -453,7 +453,6 @@ try:
 except Exception as e:
     logger.error(f"Error committing podcast to GitHub: {e}")
 
-
 try:
     if mp3_files:
         combined_audio = AudioSegment.from_file(mp3_files[0])
