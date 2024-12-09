@@ -320,7 +320,7 @@ try:
     Provide a podcast title
 
     description:
-    Provide a one-sentence description for the podcast  
+    Provide a one-sentence description for the podcast, please be more detailed. more than 200 words.
 
     Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
 
