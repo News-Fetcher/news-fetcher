@@ -144,10 +144,10 @@ app = FirecrawlApp(api_key=api_key_firecrawl)
 
 reuters_date = datetime.now().strftime("%Y-%m-%d")
 reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-reuters_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
-coindesk_date_two_days_ago = (datetime.now() - timedelta(days=2)).strftime("/%Y/%m/%d")
+coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
 # Custom rules for each website
 news_websites = {
@@ -156,7 +156,7 @@ news_websites = {
         'includePaths': [
             f'{reuters_date}',
             f'{reuters_date_yesterday}',
-            # f'{reuters_date_two_days_ago}',
+            f'{reuters_date_tomorrow}',
         ],
         'excludePaths': [
             'wrapup',
@@ -183,7 +183,7 @@ news_websites = {
         'includePaths': [
             f'{coindesk_date}',
             f'{coindesk_date_yesterday}',
-            # f'{coindesk_date_two_days_ago}',
+            f'{coindesk_date_tomorrow}',
         ],
         'excludePaths': []
     }
