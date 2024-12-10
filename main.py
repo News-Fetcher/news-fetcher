@@ -13,7 +13,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials, db, storage
 
-# Generate SHA256 hash
+# 生成 SHA256 哈希
 def calculate_sha256(file_path):
     sha256_hash = hashlib.sha256()
     with open(file_path, "rb") as f:
@@ -21,13 +21,13 @@ def calculate_sha256(file_path):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
-# Record metadata to Firebase Realtime Database
+# 记录元数据到 Firebase Realtime Database
 def record_metadata_to_firebase(title, description, sha256):
     try:
         ref = db.reference("podcasts")
         existing_data = ref.get() or []
 
-        # Ensure the data is in list format
+        # 确保数据为列表格式
         if isinstance(existing_data, dict):
             existing_data = list(existing_data.values())
 
@@ -43,7 +43,7 @@ def record_metadata_to_firebase(title, description, sha256):
     except Exception as e:
         logger.error(f"Error recording metadata to Firebase: {e}")
 
-# Upload final podcast to Firebase Storage with SHA256 as filename
+# 上传最终播客到 Firebase Storage，并以 SHA256 作为文件名
 def upload_to_firebase_storage(local_file_path, title, description):
     try:
         bucket = storage.bucket()
@@ -96,7 +96,7 @@ def retry_github_action(action, max_retries=3):
             else:
                 raise e
 
-def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url = True, need_skip_same_url = True):
+def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url=True, need_skip_same_url=True):
     logger.info(f"Processing articles from {website}...")
     local_mp3_files = []
     local_all_summaries = []
@@ -121,7 +121,6 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
                 summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very concise" 
             else:
                 summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
-
 
             single_article_prompt = f"""
             {summary_require_prompt}
@@ -183,10 +182,11 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
 
     return local_mp3_files, local_all_summaries
 
-# Set up logging
+# 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
+# 初始化 Firebase
 if not os.path.exists("./serviceAccountKey.json"):
     raise ValueError("serviceAccountKey.json not found in the current directory.")  
 
@@ -207,6 +207,7 @@ use_scraping = True
 # 如果 be_concise 为 True，则输出简洁的内容
 be_concise = True
 
+# 动态生成日期
 reuters_date = datetime.now().strftime("%Y-%m-%d")
 reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -214,48 +215,26 @@ coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
 coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
+# 加载 JSON 配置文件
+def load_json_config(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"配置文件 {file_path} 未找到。")
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-news_websites_crawl = {
-    'https://www.reuters.com': {
-        'limit': 2,
-        'includePaths': [
-            f'{reuters_date}',
-            f'{reuters_date_yesterday}',
-            f'{reuters_date_tomorrow}',
-        ],
-        'excludePaths': [
-            'wrapup',
-            'podcasts',
-        ]
-    },
-    'https://www.coindesk.com': {
-        'limit': 2,
-        'includePaths': [
-            f'{coindesk_date}',
-            f'{coindesk_date_yesterday}',
-            f'{coindesk_date_tomorrow}',
-        ],
-        'excludePaths': []
-    }
-}
+try:
+    news_websites_crawl = load_json_config("news_websites_crawl.json")
+    logger.info("成功加载 news_websites_crawl.json 配置。")
+except Exception as e:
+    logger.error(f"加载 news_websites_crawl.json 失败: {e}")
+    news_websites_crawl = {}
 
-news_websites_scraping = [
-    "https://www.qbitai.com/2024/12/229070.html",
-    "https://www.ithome.com/0/816/130.htm",
-    "https://mp.weixin.qq.com/s/KZtQYwMhdYUNVB1Cyu3AiQ",
-    "https://www.ithome.com/0/815/926.htm",
-    "https://www.ithome.com/0/816/320.htm",
-    "https://36kr.com/p/3071237074432648",
-    "https://www.ithome.com/0/816/142.htm",
-    "https://www.ithome.com/0/816/036.htm",
-    "https://www.ithome.com/0/816/040.htm",
-    "https://www.ithome.com/0/816/098.htm",
-    "https://www.ithome.com/0/815/958.htm",
-    "https://www.ithome.com/0/816/253.htm",
-    "https://mp.weixin.qq.com/s/XYuFuwtpslqHL3Vwe7B78w",
-    "https://www.ithome.com/0/816/077.htm",
-    "https://www.ithome.com/0/815/914.htm"
-]
+try:
+    news_websites_scraping = load_json_config("news_websites_scraping.json")
+    logger.info("成功加载 news_websites_scraping.json 配置。")
+except Exception as e:
+    logger.error(f"加载 news_websites_scraping.json 失败: {e}")
+    news_websites_scraping = []
 
 output_folder = "podcast_audio"
 os.makedirs(output_folder, exist_ok=True)
@@ -284,15 +263,31 @@ if use_scraping:
 else:
     # 使用 crawling 的方式获取数据
     for website, rules in news_websites_crawl.items():
+        # 根据网站动态生成包含的路径日期
+        if "reuters" in website:
+            includePaths = [
+                reuters_date,
+                reuters_date_yesterday,
+                reuters_date_tomorrow,
+            ]
+        elif "coindesk" in website:
+            includePaths = [
+                coindesk_date,
+                coindesk_date_yesterday,
+                coindesk_date_tomorrow,
+            ]
+        else:
+            includePaths = rules.get('includePaths', [])
+
         try:
             logger.info(f"Crawling website: {website} with rules {rules}")
             crawl_status = app.crawl_url(
                 website,
                 params={
-                    'limit': rules['limit'],
+                    'limit': rules.get('limit', 2),
                     'scrapeOptions': {'formats': ['markdown', 'html']},
-                    'includePaths': rules['includePaths'],
-                    'excludePaths': rules['excludePaths'],
+                    'includePaths': includePaths,
+                    'excludePaths': rules.get('excludePaths', []),
                 },
                 poll_interval=1
             )
