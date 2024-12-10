@@ -13,14 +13,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Send Email
-      uses: dawidd6/action-send-mail@v3
+    - name: Send mail
+      uses: dawidd6/action-send-mail@master
       with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.EMAIL_USER }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: GitHub Action Succeeded
-        body: Your GitHub Action has completed successfully!
-        to: ${{ secrets.EMAIL_TO }}
-        from: ${{ secrets.EMAIL_USER }}
+        server_address: smtp.163.com
+        server_port: 465
+        username: ${{ secrets.MAIL_USERNAME }}
+        password: ${{ secrets.MAIL_PASSWORD }}
+        subject: 企业微信打卡
+        body: file://email.txt
+        to: 1216414009@qq.com
+        from: GitHub Actions
