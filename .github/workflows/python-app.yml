@@ -1,9 +1,16 @@
+# .github/workflows/main.yml
 name: Podcast Generator Workflow
 
 on:
+  workflow_dispatch:
+    inputs:
+      scraping_config:
+        description: 'News Websites Scraping 配置 (JSON 格式)'
+        required: false
+        default: '{}' # 默认空 JSON 对象
   schedule:
     - cron: "0 1 * * *" 
-  workflow_dispatch: # 手动触发
+  # 保留手动触发
 
 jobs:
   build-and-run:
@@ -37,5 +44,6 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config }}
         run: python main.py
     environment: Tim-s-News # 显式指定环境

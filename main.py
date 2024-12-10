@@ -1,3 +1,4 @@
+# main.py
 import os
 import logging
 import re
@@ -182,39 +183,6 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
 
     return local_mp3_files, local_all_summaries
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger()
-
-# 初始化 Firebase
-if not os.path.exists("./serviceAccountKey.json"):
-    raise ValueError("serviceAccountKey.json not found in the current directory.")  
-
-cred = credentials.Certificate("./serviceAccountKey.json")
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app',
-    'storageBucket': 'news-fetcher-platform.firebasestorage.app'
-})
-
-client = OpenAI()
-api_key_firecrawl = os.getenv("FIRECRAWL_API_KEY")
-if not api_key_firecrawl:
-    raise ValueError("Firecrawl API key not set in environment variables.")
-app = FirecrawlApp(api_key=api_key_firecrawl)
-
-# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-use_scraping = True
-# 如果 be_concise 为 True，则输出简洁的内容
-be_concise = True
-
-# 动态生成日期
-reuters_date = datetime.now().strftime("%Y-%m-%d")
-reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-coindesk_date = datetime.now().strftime("/%Y/%m/%d")
-coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
-coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
-
 # 加载 JSON 配置文件
 def load_json_config(file_path):
     if not os.path.exists(file_path):
@@ -222,267 +190,313 @@ def load_json_config(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-try:
-    news_websites_crawl = load_json_config("news_websites_crawl.json")
-    logger.info("成功加载 news_websites_crawl.json 配置。")
-except Exception as e:
-    logger.error(f"加载 news_websites_crawl.json 失败: {e}")
-    news_websites_crawl = {}
+# 主函数入口
+def main():
+    # 设置日志
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger()
 
-try:
-    news_websites_scraping = load_json_config("news_websites_scraping.json")
-    logger.info("成功加载 news_websites_scraping.json 配置。")
-except Exception as e:
-    logger.error(f"加载 news_websites_scraping.json 失败: {e}")
-    news_websites_scraping = []
+    # 初始化 Firebase
+    if not os.path.exists("./serviceAccountKey.json"):
+        raise ValueError("serviceAccountKey.json not found in the current directory.")  
 
-output_folder = "podcast_audio"
-os.makedirs(output_folder, exist_ok=True)
+    cred = credentials.Certificate("./serviceAccountKey.json")
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app',
+        'storageBucket': 'news-fetcher-platform.firebasestorage.app'
+    })
 
-logger.info("Starting to gather, summarize, and generate audio for news articles...")
+    client = OpenAI()
+    api_key_firecrawl = os.getenv("FIRECRAWL_API_KEY")
+    if not api_key_firecrawl:
+        raise ValueError("Firecrawl API key not set in environment variables.")
+    app = FirecrawlApp(api_key=api_key_firecrawl)
 
-mp3_files = []
-all_summaries = []
+    # 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
+    use_scraping = True
+    # 如果 be_concise 为 True，则输出简洁的内容
+    be_concise = True
 
-if use_scraping:
-    # 使用 scraping 的方式获取数据
-    for single_url in news_websites_scraping:
-        try:
-            logger.info(f"Scraping single URL: {single_url}")
-            scrape_result = app.scrape_url(single_url, params={'formats': ['markdown', 'html']})
-            if scrape_result:
-                # 构造与爬取数据类似的结构
-                news_articles = [scrape_result] if 'markdown' in scrape_result else []
-                logger.info(f"Found {len(news_articles)} articles from {single_url}.")
-                if news_articles:
-                    local_mp3_files, local_all_summaries = process_articles(news_articles, single_url, client, output_folder, False, False)
-                    mp3_files.extend(local_mp3_files)
-                    all_summaries.extend(local_all_summaries)
-        except Exception as e:
-            logger.error(f"Error scraping {single_url}: {e}")
-else:
-    # 使用 crawling 的方式获取数据
-    for website, rules in news_websites_crawl.items():
-        # 根据网站动态生成包含的路径日期
-        includePaths = rules.get('includePaths', [])
-        if "reuters" in website:
-            includePaths.extend([
-                reuters_date,
-                reuters_date_yesterday,
-                reuters_date_tomorrow,
-            ])
-        elif "coindesk" in website:
-            includePaths.extend([
-                coindesk_date,
-                coindesk_date_yesterday,
-                coindesk_date_tomorrow,
-            ])
+    # 动态生成日期
+    reuters_date = datetime.now().strftime("%Y-%m-%d")
+    reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    coindesk_date = datetime.now().strftime("/%Y/%m/%d")
+    coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
+    coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
-        try:
-            logger.info(f"Crawling website: {website} with rules {rules}")
-            crawl_status = app.crawl_url(
-                website,
-                params={
-                    'limit': rules.get('limit', 2),
-                    'scrapeOptions': {'formats': ['markdown', 'html']},
-                    'includePaths': includePaths,
-                    'excludePaths': rules.get('excludePaths', []),
-                },
-                poll_interval=1
-            )
+    try:
+        news_websites_crawl = load_json_config("news_websites_crawl.json")
+        logger.info("Successfully loaded news_websites_crawl.json configuration.")
+    except Exception as e:
+        logger.error(f"Failed to load news_websites_crawl.json: {e}")
+        news_websites_crawl = {}
 
-            news_articles = crawl_status.get('data', [])
+    # Load configuration
+    try:
+        # Attempt to read scraping configuration from environment variable
+        scraping_config_str = os.getenv("SCRAPING_CONFIG")
+        if scraping_config_str and scraping_config_str != '{}':
+            news_websites_scraping = json.loads(scraping_config_str)
+            logger.info("Successfully loaded news_websites_scraping configuration from environment variable.")
+        else:
+            # If environment variable is not provided, load local configuration
+            news_websites_scraping = load_json_config("news_websites_scraping.json")
+            logger.info("Successfully loaded local news_websites_scraping.json configuration.")
+    except Exception as e:
+        logger.error(f"Failed to load news_websites_scraping configuration: {e}")
+        news_websites_scraping = {}
 
-            if not news_articles:
-                logger.warning(f"No news articles found in the crawl data for {website}.")
+    output_folder = "podcast_audio"
+    os.makedirs(output_folder, exist_ok=True)
+
+    logger.info("Starting to gather, summarize, and generate audio for news articles...")
+
+    mp3_files = []
+    all_summaries = []
+
+    if use_scraping:
+        # 使用 scraping 的方式获取数据
+        for single_url in news_websites_scraping:
+            try:
+                logger.info(f"Scraping single URL: {single_url}")
+                scrape_result = app.scrape_url(single_url, params={'formats': ['markdown', 'html']})
+                if scrape_result:
+                    # 构造与爬取数据类似的结构
+                    news_articles = [scrape_result] if 'markdown' in scrape_result else []
+                    logger.info(f"Found {len(news_articles)} articles from {single_url}.")
+                    if news_articles:
+                        local_mp3_files, local_all_summaries = process_articles(news_articles, single_url, client, output_folder, False, False)
+                        mp3_files.extend(local_mp3_files)
+                        all_summaries.extend(local_all_summaries)
+            except Exception as e:
+                logger.error(f"Error scraping {single_url}: {e}")
+    else:
+        # 使用 crawling 的方式获取数据
+        for website, rules in news_websites_crawl.items():
+            # 根据网站动态生成包含的路径日期
+            includePaths = rules.get('includePaths', [])
+            if "reuters" in website:
+                includePaths.extend([
+                    reuters_date,
+                    reuters_date_yesterday,
+                    reuters_date_tomorrow,
+                ])
+            elif "coindesk" in website:
+                includePaths.extend([
+                    coindesk_date,
+                    coindesk_date_yesterday,
+                    coindesk_date_tomorrow,
+                ])
+
+            try:
+                logger.info(f"Crawling website: {website} with rules {rules}")
+                crawl_status = app.crawl_url(
+                    website,
+                    params={
+                        'limit': rules.get('limit', 2),
+                        'scrapeOptions': {'formats': ['markdown', 'html']},
+                        'includePaths': includePaths,
+                        'excludePaths': rules.get('excludePaths', []),
+                    },
+                    poll_interval=1
+                )
+
+                news_articles = crawl_status.get('data', [])
+
+                if not news_articles:
+                    logger.warning(f"No news articles found in the crawl data for {website}.")
+                    continue
+
+                logger.info(f"Found {len(news_articles)} articles from {website}.")
+
+                local_mp3_files, local_all_summaries = process_articles(news_articles, website, client, output_folder)
+                mp3_files.extend(local_mp3_files)
+                all_summaries.extend(local_all_summaries)
+
+            except Exception as e:
+                logger.error(f"Error while crawling {website}: {e}")
                 continue
 
-            logger.info(f"Found {len(news_articles)} articles from {website}.")
+    logger.info("Generating introduction for the podcast...")
+    title = ""
 
-            local_mp3_files, local_all_summaries = process_articles(news_articles, website, client, output_folder)
-            mp3_files.extend(local_mp3_files)
-            all_summaries.extend(local_all_summaries)
-
-        except Exception as e:
-            logger.error(f"Error while crawling {website}: {e}")
-            continue
-
-logger.info("Generating introduction for the podcast...")
-title = ""
-
-try:
-    example_json = {
-        "opening": "",
-        "title": "",
-        "description": "",
-        "ending": ""
-    }
-    intro_prompt = f"""
-    Please follow the following instructions to generate a podcast introduction:
-    
-    the opening:
-    Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and summarize the main topics
-    the important thing is need to be detailed, not too short
-
-    the title:
-    Provide a podcast title
-
-    description:
-    Provide a one-sentence description for the podcast, Be a little more detailed, but no more than 200 words. 
-
-    the ending:
-    Provide a one-sentence ending for the podcast
-
-    Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
-
-    {json.dumps(example_json)}
-
-    This JSON provides a structured format for integrating the introduction, title, and description into your script or further processes.
-
-    So the summaries is:
-    {chr(10).join(all_summaries)}
-    """
-    intro_response = client.chat.completions.create(
-        model="gpt-4o-mini-2024-07-18",
-        messages=[
-            {
-                "role": "system",
-                "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"
-            },
-            {
-                "role": "user",
-                "content": intro_prompt,
-            }
-        ]
-    )
-
-    intro_json = intro_response.choices[0].message.content
-    logger.info(f"Introduction generated:\n{intro_json}")
-
-    if intro_json.strip().startswith("{") and intro_json.strip().endswith("}"):
-        cleaned_json = intro_json.strip()
-    elif "```json" in intro_json:
-        match = re.search(r"```json(.*?)```", intro_json, re.DOTALL)
-        cleaned_json = match.group(1).strip() if match else intro_json.strip()
-    elif "```" in intro_json:
-        match = re.search(r"```(.*?)```", intro_json, re.DOTALL)
-        cleaned_json = match.group(1).strip() if match else intro_json.strip()
-    else:
-        cleaned_json = intro_json.strip()
-    
-    intro_data = json.loads(cleaned_json)
-    
-    opening = intro_data.get('opening', '欢迎收听今天的新闻播客，我们将为您带来最新的新闻动态。')
-    title = intro_data.get('title', '今日新闻播客News~')
-    description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
-    ending = intro_data.get('ending', '感谢您的收听，我们下期节目再见。')
-
-    intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
-    intro_tts_response = client.audio.speech.create(
-        model="tts-1",
-        voice="echo",
-        speed=1.3,
-        input=opening
-    )
-    intro_tts_response.stream_to_file(intro_audio_path)
-    mp3_files.insert(0, intro_audio_path)
-    logger.info(f"Introduction audio saved: {intro_audio_path}")
-
-    ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
-    ending_tts_response = client.audio.speech.create(
-        model="tts-1",
-        voice="echo",
-        speed=1.3,
-        input=ending
-    )
-    ending_tts_response.stream_to_file(ending_audio_path)
-    mp3_files.append(ending_audio_path)
-    logger.info(f"Ending audio saved: {ending_audio_path}")
-
-except Exception as e:
-    logger.error(f"Error generating podcast introduction: {e}")
-
-logger.info("Merging all audio files into a final podcast...")
-today_date = datetime.now().strftime("%Y-%m-%d")
-podcast_name = f"{today_date}_{title}.mp3"
-final_podcast = Path(output_folder) / podcast_name
-
-try:
-    if mp3_files:
-        combined_audio = AudioSegment.from_file(mp3_files[0])
-        for mp3_file in mp3_files[1:]:
-            combined_audio += AudioSegment.from_file(mp3_file)
-
-        combined_audio.export(final_podcast, format="mp3")
-        logger.info(f"Final podcast saved as: {final_podcast}")
-    else:
-        logger.warning("No audio files were generated to merge.")
-except Exception as e:
-    logger.error(f"Error combining MP3 files: {e}")
-
-logger.info("Committing the final podcast to GitHub...")
-GH_ACCESS_TOKEN = os.getenv("GH_ACCESS_TOKEN")
-if not GH_ACCESS_TOKEN:
-    raise ValueError("GitHub access token not set in environment variables.")
-
-REPO_NAME = "nagisa77/posts"
-COMMIT_FILE_PATH = f"podcasts/{podcast_name}"
-
-try:
-    g = Github(GH_ACCESS_TOKEN)
-    repo = g.get_repo(REPO_NAME)
-
-    branch_name = "main"
     try:
-        repo.get_branch(branch_name)
-    except Exception:
-        repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=repo.get_branch("master").commit.sha)
+        example_json = {
+            "opening": "",
+            "title": "",
+            "description": "",
+            "ending": ""
+        }
+        intro_prompt = f"""
+        Please follow the following instructions to generate a podcast introduction:
 
-    if os.path.getsize(final_podcast) > 100 * 1024 * 1024:
-        raise ValueError("File size too large for GitHub commit.")
+        the opening:
+        Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and summarize the main topics
+        the important thing is need to be detailed, not too short
 
-    with open(final_podcast, "rb") as podcast_file:
-        content = podcast_file.read()
+        the title:
+        Provide a podcast title
 
-    def commit_action():
+        description:
+        Provide a one-sentence description for the podcast, Be a little more detailed, but no more than 200 words. 
+
+        the ending:
+        Provide a one-sentence ending for the podcast
+
+        Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
+
+        {json.dumps(example_json)}
+
+        This JSON provides a structured format for integrating the introduction, title, and description into your script or further processes.
+
+        So the summaries is:
+        {chr(10).join(all_summaries)}
+        """
+        intro_response = client.chat.completions.create(
+            model="gpt-4o-mini-2024-07-18",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"
+                },
+                {
+                    "role": "user",
+                    "content": intro_prompt,
+                }
+            ]
+        )
+
+        intro_json = intro_response.choices[0].message.content
+        logger.info(f"Introduction generated:\n{intro_json}")
+
+        if intro_json.strip().startswith("{") and intro_json.strip().endswith("}"):
+            cleaned_json = intro_json.strip()
+        elif "```json" in intro_json:
+            match = re.search(r"```json(.*?)```", intro_json, re.DOTALL)
+            cleaned_json = match.group(1).strip() if match else intro_json.strip()
+        elif "```" in intro_json:
+            match = re.search(r"```(.*?)```", intro_json, re.DOTALL)
+            cleaned_json = match.group(1).strip() if match else intro_json.strip()
+        else:
+            cleaned_json = intro_json.strip()
+
+        intro_data = json.loads(cleaned_json)
+
+        opening = intro_data.get('opening', '欢迎收听今天的新闻播客，我们将为您带来最新的新闻动态。')
+        title = intro_data.get('title', '今日新闻播客News~')
+        description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
+        ending = intro_data.get('ending', '感谢您的收听，我们下期节目再见。')
+
+        intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
+        intro_tts_response = client.audio.speech.create(
+            model="tts-1",
+            voice="echo",
+            speed=1.3,
+            input=opening
+        )
+        intro_tts_response.stream_to_file(intro_audio_path)
+        mp3_files.insert(0, intro_audio_path)
+        logger.info(f"Introduction audio saved: {intro_audio_path}")
+
+        ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
+        ending_tts_response = client.audio.speech.create(
+            model="tts-1",
+            voice="echo",
+            speed=1.3,
+            input=ending
+        )
+        ending_tts_response.stream_to_file(ending_audio_path)
+        mp3_files.append(ending_audio_path)
+        logger.info(f"Ending audio saved: {ending_audio_path}")
+
+    except Exception as e:
+        logger.error(f"Error generating podcast introduction: {e}")
+
+    logger.info("Merging all audio files into a final podcast...")
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    podcast_name = f"{today_date}_{title}.mp3"
+    final_podcast = Path(output_folder) / podcast_name
+
+    try:
+        if mp3_files:
+            combined_audio = AudioSegment.from_file(mp3_files[0])
+            for mp3_file in mp3_files[1:]:
+                combined_audio += AudioSegment.from_file(mp3_file)
+
+            combined_audio.export(final_podcast, format="mp3")
+            logger.info(f"Final podcast saved as: {final_podcast}")
+        else:
+            logger.warning("No audio files were generated to merge.")
+    except Exception as e:
+        logger.error(f"Error combining MP3 files: {e}")
+
+    logger.info("Committing the final podcast to GitHub...")
+    GH_ACCESS_TOKEN = os.getenv("GH_ACCESS_TOKEN")
+    if not GH_ACCESS_TOKEN:
+        raise ValueError("GitHub access token not set in environment variables.")
+
+    REPO_NAME = "nagisa77/posts"
+    COMMIT_FILE_PATH = f"podcasts/{podcast_name}"
+
+    try:
+        g = Github(GH_ACCESS_TOKEN)
+        repo = g.get_repo(REPO_NAME)
+
+        branch_name = "main"
         try:
-            existing_file = repo.get_contents(COMMIT_FILE_PATH, ref=branch_name)
-            return repo.update_file(
-                COMMIT_FILE_PATH,
-                f"Update podcast for {today_date}",
-                content,
-                existing_file.sha,
-                branch=branch_name
-            )
-        except:
-            return repo.create_file(
-                COMMIT_FILE_PATH,
-                f"Add podcast for {today_date}",
-                content,
-                branch=branch_name
-            )
+            repo.get_branch(branch_name)
+        except Exception:
+            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=repo.get_branch("master").commit.sha)
 
-    retry_github_action(commit_action)
-    logger.info(f"Podcast committed successfully to GitHub: {COMMIT_FILE_PATH}")
+        if os.path.getsize(final_podcast) > 100 * 1024 * 1024:
+            raise ValueError("File size too large for GitHub commit.")
 
-except Exception as e:
-    logger.error(f"Error committing podcast to GitHub: {e}")
+        with open(final_podcast, "rb") as podcast_file:
+            content = podcast_file.read()
 
-try:
-    if mp3_files:
-        combined_audio = AudioSegment.from_file(mp3_files[0])
-        for mp3_file in mp3_files[1:]:
-            combined_audio += AudioSegment.from_file(mp3_file)
+        def commit_action():
+            try:
+                existing_file = repo.get_contents(COMMIT_FILE_PATH, ref=branch_name)
+                return repo.update_file(
+                    COMMIT_FILE_PATH,
+                    f"Update podcast for {today_date}",
+                    content,
+                    existing_file.sha,
+                    branch=branch_name
+                )
+            except:
+                return repo.create_file(
+                    COMMIT_FILE_PATH,
+                    f"Add podcast for {today_date}",
+                    content,
+                    branch=branch_name
+                )
 
-        combined_audio.export(final_podcast, format="mp3")
-        logger.info(f"Final podcast saved as: {final_podcast}")
+        retry_github_action(commit_action)
+        logger.info(f"Podcast committed successfully to GitHub: {COMMIT_FILE_PATH}")
 
-        # 上传到 Firebase Storage
-        firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
-        if firebase_url:
-            logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
+    except Exception as e:
+        logger.error(f"Error committing podcast to GitHub: {e}")
 
-    else:
-        logger.warning("No audio files were generated to merge.")
-except Exception as e:
-    logger.error(f"Error combining MP3 files: {e}")
+    try:
+        if mp3_files:
+            combined_audio = AudioSegment.from_file(mp3_files[0])
+            for mp3_file in mp3_files[1:]:
+                combined_audio += AudioSegment.from_file(mp3_file)
+
+            combined_audio.export(final_podcast, format="mp3")
+            logger.info(f"Final podcast saved as: {final_podcast}")
+
+            # 上传到 Firebase Storage
+            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
+            if firebase_url:
+                logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
+
+        else:
+            logger.warning("No audio files were generated to merge.")
+    except Exception as e:
+        logger.error(f"Error combining MP3 files: {e}")
+
+if __name__ == "__main__":
+    main()
