@@ -19,6 +19,10 @@ use_scraping = False
 # 如果 be_concise 为 True，则输出简洁的内容
 be_concise = True
 
+# 设置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger()
+
 # 生成 SHA256 哈希
 def calculate_sha256(file_path):
     sha256_hash = hashlib.sha256()
@@ -197,10 +201,6 @@ def load_json_config(file_path):
 
 # 主函数入口
 def main():
-    # 设置日志
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger()
-
     # 初始化 Firebase
     if not os.path.exists("./serviceAccountKey.json"):
         raise ValueError("serviceAccountKey.json not found in the current directory.")  
