@@ -15,7 +15,7 @@ import firebase_admin
 from firebase_admin import credentials, db, storage
 
 # 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-use_scraping = False
+use_scraping = True
 # 如果 be_concise 为 True，则输出简洁的内容
 be_concise = True
 
