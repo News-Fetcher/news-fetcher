@@ -116,8 +116,15 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
             meta_data = article.get('metadata', {})
             title = meta_data.get('title', '')
             url = meta_data.get('sourceURL', '')
+
+            if be_concise:
+                summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very concise" 
+            else:
+                summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
+
+
             single_article_prompt = f"""
-            Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:
+            {summary_require_prompt}
 
             Article Title: {title}
             Article URL: {url}
@@ -152,8 +159,14 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
                 if need_add_to_fetched_url:
                     add_url_to_fetched(url)
 
+                # 根据url生成一个哈希，避免和index挂钩，同时也避免中文等问题
+                url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:8]
                 domain = extract_domain(website)
-                speech_file_path = Path(output_folder) / f"summary_{domain}_{idx + 1}.mp3"
+                # 将domain和hash组合成为文件名，并去除特殊字符
+                safe_domain = re.sub(r'[^\w.-]', '_', domain)
+                filename = f"summary_{safe_domain}_{url_hash}.mp3"
+                speech_file_path = Path(output_folder) / filename
+
                 tts_response = client.audio.speech.create(
                     model="tts-1",
                     voice="echo",
@@ -162,7 +175,7 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
                 )
                 tts_response.stream_to_file(speech_file_path)
                 local_mp3_files.append(speech_file_path)
-                logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}")
+                logger.info(f"Audio saved for article: {speech_file_path}")
 
             except Exception as e:
                 logger.error(f"Error during summarization or TTS for article {idx + 1} from {website}: {e}")
@@ -189,6 +202,11 @@ if not api_key_firecrawl:
     raise ValueError("Firecrawl API key not set in environment variables.")
 app = FirecrawlApp(api_key=api_key_firecrawl)
 
+# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
+use_scraping = False
+# 如果 be_concise 为 True，则输出简洁的内容
+be_concise = True
+
 reuters_date = datetime.now().strftime("%Y-%m-%d")
 reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -196,8 +214,6 @@ coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
 coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
-# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-use_scraping = True
 
 news_websites_crawl = {
     'https://www.reuters.com': {
