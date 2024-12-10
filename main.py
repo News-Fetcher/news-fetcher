@@ -37,7 +37,6 @@ def record_metadata_to_firebase(title, description, sha256):
             "sha256": sha256,
         }
 
-        # Append the new metadata to the list
         existing_data.append(metadata)
         ref.set(existing_data)  # Save the updated list back to the database
         logger.info(f"Metadata recorded to Firebase as array: {metadata}")
@@ -64,14 +63,11 @@ def upload_to_firebase_storage(local_file_path, title, description):
 
 # Generate signed URL
 def generate_signed_url(bucket_name, blob_name, expiration_minutes=60):
-    """Generate a signed URL for a file in Google Cloud Storage."""
     try:
-        # Initialize Google Cloud Storage client
         client = storage.Client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
 
-        # Generate the signed URL
         url = blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(minutes=expiration_minutes),
@@ -83,11 +79,10 @@ def generate_signed_url(bucket_name, blob_name, expiration_minutes=60):
         logger.error(f"Error generating signed URL: {e}")
         return None
 
-# Check and update URLs in Firebase
 def is_url_fetched(url):
     try:
         ref = db.reference("fetched_urls")
-        fetched_urls = ref.get() or []  # Get existing URLs or initialize with an empty list
+        fetched_urls = ref.get() or []
         return url in fetched_urls
     except Exception as e:
         logger.error(f"Error checking URL in Firebase: {e}")
@@ -96,21 +91,19 @@ def is_url_fetched(url):
 def add_url_to_fetched(url):
     try:
         ref = db.reference("fetched_urls")
-        fetched_urls = ref.get() or []  # Get existing URLs or initialize with an empty list
+        fetched_urls = ref.get() or []
         if url not in fetched_urls:
             fetched_urls.append(url)
-            ref.set(fetched_urls)  # Update Firebase with the new list
+            ref.set(fetched_urls)
     except Exception as e:
         logger.error(f"Error adding URL to Firebase: {e}")
 
-# Extract domain function
 def extract_domain(url):
     match = re.search(r'https?://([^/]+)', url)
     if match:
         return match.group(1)
     return "unknown_domain"
 
-# Retry decorator for GitHub actions
 def retry_github_action(action, max_retries=3):
     for attempt in range(max_retries):
         try:
@@ -120,7 +113,80 @@ def retry_github_action(action, max_retries=3):
                 time.sleep(2 ** attempt)
             else:
                 raise e
-                
+
+def process_articles(news_articles, website, client, output_folder):
+    logger.info(f"Processing articles from {website}...")
+    local_mp3_files = []
+    local_all_summaries = []
+
+    for idx, article in enumerate(news_articles):
+        url = article.get('metadata', {}).get('sourceURL', '')
+        if (url == website):
+            logger.info(f"Skipping article {idx + 1} from {website} because it's the same as the website URL.")
+            continue
+
+        if is_url_fetched(url):
+            logger.info(f"Article {idx + 1} already fetched, skipping: {url}")
+            continue
+
+        markdown_content = article.get('markdown', '')
+        if markdown_content:
+            meta_data = article.get('metadata', {})
+            title = meta_data.get('title', '')
+            url = meta_data.get('sourceURL', '')
+            single_article_prompt = f"""
+            Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:
+
+            Article Title: {title}
+            Article URL: {url}
+
+            Article Content:
+            {markdown_content}
+            """
+
+            logger.info(f"Summarizing article {idx + 1} from {website} with title: {title} and URL: {url}...")
+            try:
+                article_response = client.chat.completions.create(
+                    model="gpt-4o-mini-2024-07-18",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。 \
+                                        在回答问题时，使用简洁、有条理、流畅且富有感染力的语言风格。 \
+                                        确保语气专业、清晰且富有吸引力，适合公众广播或播客节目。\
+                                        总结新闻的时候，先说类似“接下来的这则（来自xxx网站）新闻讲的是/描述了...” 之类的，\
+                                        引出接下来的内容, "
+                        },
+                        {
+                            "role": "user",
+                            "content": single_article_prompt,
+                        }
+                    ]
+                )
+                article_summary = article_response.choices[0].message.content
+                logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
+
+                local_all_summaries.append(article_summary)
+                add_url_to_fetched(url)
+
+                domain = extract_domain(website)
+                speech_file_path = Path(output_folder) / f"summary_{domain}_{idx + 1}.mp3"
+                tts_response = client.audio.speech.create(
+                    model="tts-1",
+                    voice="echo",
+                    speed=1.3,
+                    input=article_summary
+                )
+                tts_response.stream_to_file(speech_file_path)
+                local_mp3_files.append(speech_file_path)
+                logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}")
+
+            except Exception as e:
+                logger.error(f"Error during summarization or TTS for article {idx + 1} from {website}: {e}")
+                continue
+
+    return local_mp3_files, local_all_summaries
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -135,7 +201,6 @@ firebase_admin.initialize_app(cred, {
     'storageBucket': 'news-fetcher-platform.firebasestorage.app'
 })
 
-# Initialize OpenAI and Firecrawl clients
 client = OpenAI()
 api_key_firecrawl = os.getenv("FIRECRAWL_API_KEY")
 if not api_key_firecrawl:
@@ -149,10 +214,9 @@ coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
 coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
-# Custom rules for each website
-news_websites = {
+news_websites_crawl = {
     'https://www.reuters.com': {
-        'limit': 24,
+        'limit': 2,
         'includePaths': [
             f'{reuters_date}',
             f'{reuters_date_yesterday}',
@@ -163,23 +227,8 @@ news_websites = {
             'podcasts',
         ]
     },
-    # 'https://cointelegraph.com': {
-    #     'limit': 7,
-    #     'includePaths': [
-    #         'news/*',
-    #         # 'technology/*',
-    #     ],
-    #     'excludePaths': []
-    # },
-    # 'https://apnews.com': {
-    #     'limit': 7,
-    #     'includePaths': [
-    #         # 'article',
-    #     ],
-    #     'excludePaths': []
-    # },
     'https://www.coindesk.com': {
-        'limit': 24,
+        'limit': 2,
         'includePaths': [
             f'{coindesk_date}',
             f'{coindesk_date_yesterday}',
@@ -189,17 +238,15 @@ news_websites = {
     }
 }
 
-# Folder for saving audio files
 output_folder = "podcast_audio"
 os.makedirs(output_folder, exist_ok=True)
 
 logger.info("Starting to crawl, summarize, and generate audio for news websites...")
 
-# Crawl and process each website
 mp3_files = []
 all_summaries = []
 
-for website, rules in news_websites.items():
+for website, rules in news_websites_crawl.items():
     try:
         logger.info(f"Crawling website: {website} with rules {rules}")
         crawl_status = app.crawl_url(
@@ -221,85 +268,15 @@ for website, rules in news_websites.items():
 
         logger.info(f"Found {len(news_articles)} articles from {website}.")
 
-        for article in news_articles:
-            logger.info(f"Article URL: {article.get('metadata', {}).get('sourceURL', '')}")
-
-        # Summarize and generate audio for each article
-        for idx, article in enumerate(news_articles):
-            url = article.get('metadata', {}).get('sourceURL', '')
-            if (url == website):
-                logger.info(f"Skipping article {idx + 1} from {website} because it's the same as the website URL.")
-                continue
-
-            if is_url_fetched(url):
-                logger.info(f"Article {idx + 1} already fetched, skipping: {url}")
-                continue
-
-            markdown_content = article.get('markdown', '')
-            if markdown_content:
-                meta_data = article.get('metadata', {})
-                title = meta_data.get('title', '')
-                url = meta_data.get('sourceURL', '')
-                single_article_prompt = f"""
-                Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:
-
-                Article Title: {title}
-                Article URL: {url}
-
-                Article Content:
-                {markdown_content}
-                """
-
-                logger.info(f"Summarizing article {idx + 1} from {website} with title: {title} and URL: {url}...")
-                try:
-                    article_response = client.chat.completions.create(
-                        model="gpt-4o-mini-2024-07-18",
-                        messages=[
-                            {
-                              "role": "system",
-                              "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。 \
-                                        在回答问题时，使用简洁、有条理、流畅且富有感染力的语言风格。 \
-                                        确保语气专业、清晰且富有吸引力，适合公众广播或播客节目。\
-                                        总结新闻的时候，先说类似“接下来的这则（来自xxx网站）新闻讲的是/描述了...” 之类的，\
-                                        引出接下来的内容, "
-                            }, 
-                            {
-                                "role": "user",
-                                "content": single_article_prompt,
-                            }
-                        ]
-                    )
-                    article_summary = article_response.choices[0].message.content
-                    logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
-
-                    all_summaries.append(article_summary)
-
-                    # Mark the URL as fetched
-                    add_url_to_fetched(url)
-
-                    # Generate TTS audio
-                    domain = extract_domain(website)
-                    speech_file_path = Path(output_folder) / f"summary_{domain}_{idx + 1}.mp3"
-
-                    tts_response = client.audio.speech.create(
-                        model="tts-1",
-                        voice="echo",
-                        speed=1.3,
-                        input=article_summary
-                    )
-                    tts_response.stream_to_file(speech_file_path)
-                    mp3_files.append(speech_file_path)
-                    logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}")
-
-                except Exception as e:
-                    logger.error(f"Error during summarization or TTS for article {idx + 1} from {website}: {e}")
-                    continue
+        # 调用整理出的函数
+        local_mp3_files, local_all_summaries = process_articles(news_articles, website, client, output_folder)
+        mp3_files.extend(local_mp3_files)
+        all_summaries.extend(local_all_summaries)
 
     except Exception as e:
         logger.error(f"Error while crawling {website}: {e}")
         continue
 
-# Generate podcast introduction
 logger.info("Generating introduction for the podcast...")
 title = ""
 
@@ -348,20 +325,15 @@ try:
     intro_json = intro_response.choices[0].message.content
     logger.info(f"Introduction generated:\n{intro_json}")
 
-    # 匹配不同的可能情况
     if intro_json.strip().startswith("{") and intro_json.strip().endswith("}"):
-        # Case 1: 直接是 JSON 数据
         cleaned_json = intro_json.strip()
     elif "```json" in intro_json:
-        # Case 2: ```json 开头的 JSON 数据
         match = re.search(r"```json(.*?)```", intro_json, re.DOTALL)
         cleaned_json = match.group(1).strip() if match else intro_json.strip()
     elif "```" in intro_json:
-        # Case 3: ``` 开头的 JSON 数据
         match = re.search(r"```(.*?)```", intro_json, re.DOTALL)
         cleaned_json = match.group(1).strip() if match else intro_json.strip()
     else:
-        # 如果没有匹配到特定情况，保留原始内容
         cleaned_json = intro_json.strip()
     
     intro_data = json.loads(cleaned_json)
@@ -384,7 +356,6 @@ try:
 except Exception as e:
     logger.error(f"Error generating podcast introduction: {e}")
 
-# Merge audio files into a single podcast
 logger.info("Merging all audio files into a final podcast...")
 today_date = datetime.now().strftime("%Y-%m-%d")
 podcast_name = f"{today_date}_{title}.mp3"
@@ -403,9 +374,7 @@ try:
 except Exception as e:
     logger.error(f"Error combining MP3 files: {e}")
 
-# Commit the podcast to GitHub
 logger.info("Committing the final podcast to GitHub...")
-
 GH_ACCESS_TOKEN = os.getenv("GH_ACCESS_TOKEN")
 if not GH_ACCESS_TOKEN:
     raise ValueError("GitHub access token not set in environment variables.")
@@ -463,8 +432,7 @@ try:
         logger.info(f"Final podcast saved as: {final_podcast}")
 
         # 上传到 Firebase Storage
-        firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
-
+        firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
         if firebase_url:
             logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
 
