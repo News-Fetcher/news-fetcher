@@ -96,14 +96,14 @@ def retry_github_action(action, max_retries=3):
             else:
                 raise e
 
-def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url = True):
+def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url = True, need_skip_same_url = True):
     logger.info(f"Processing articles from {website}...")
     local_mp3_files = []
     local_all_summaries = []
 
     for idx, article in enumerate(news_articles):
         url = article.get('metadata', {}).get('sourceURL', '')
-        if (url == website):
+        if need_skip_same_url and (url == website):
             logger.info(f"Skipping article {idx + 1} from {website} because it's the same as the website URL.")
             continue
 
@@ -197,7 +197,7 @@ coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/
 coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
 
 # 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-use_scraping = False
+use_scraping = True
 
 news_websites_crawl = {
     'https://www.reuters.com': {
@@ -253,7 +253,6 @@ if use_scraping:
     # 使用 scraping 的方式获取数据
     for single_url in news_websites_scraping:
         try:
-            domain = extract_domain(single_url)
             logger.info(f"Scraping single URL: {single_url}")
             scrape_result = app.scrape_url(single_url, params={'formats': ['markdown', 'html']})
             if scrape_result:
@@ -261,7 +260,7 @@ if use_scraping:
                 news_articles = [scrape_result] if 'markdown' in scrape_result else []
                 logger.info(f"Found {len(news_articles)} articles from {single_url}.")
                 if news_articles:
-                    local_mp3_files, local_all_summaries = process_articles(news_articles, domain, client, output_folder, False)
+                    local_mp3_files, local_all_summaries = process_articles(news_articles, single_url, client, output_folder, False, False)
                     mp3_files.extend(local_mp3_files)
                     all_summaries.extend(local_all_summaries)
         except Exception as e:
