@@ -1,11 +1,7 @@
 {
   "https://www.reuters.com": {
       "limit": 2,
-      "includePaths": [
-          "2024-04-27",
-          "2024-04-26",
-          "2024-04-28"
-      ],
+      "includePaths": [],
       "excludePaths": [
           "wrapup",
           "podcasts"
@@ -13,11 +9,7 @@
   },
   "https://www.coindesk.com": {
       "limit": 2,
-      "includePaths": [
-          "/2024/04/27",
-          "/2024/04/26",
-          "/2024/04/28"
-      ],
+      "includePaths": [],
       "excludePaths": []
   }
 }

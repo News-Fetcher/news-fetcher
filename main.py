@@ -264,20 +264,19 @@ else:
     # 使用 crawling 的方式获取数据
     for website, rules in news_websites_crawl.items():
         # 根据网站动态生成包含的路径日期
+        includePaths = rules.get('includePaths', [])
         if "reuters" in website:
-            includePaths = [
+            includePaths.extend([
                 reuters_date,
                 reuters_date_yesterday,
                 reuters_date_tomorrow,
-            ]
+            ])
         elif "coindesk" in website:
-            includePaths = [
+            includePaths.extend([
                 coindesk_date,
                 coindesk_date_yesterday,
                 coindesk_date_tomorrow,
-            ]
-        else:
-            includePaths = rules.get('includePaths', [])
+            ])
 
         try:
             logger.info(f"Crawling website: {website} with rules {rules}")
