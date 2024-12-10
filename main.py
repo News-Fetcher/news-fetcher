@@ -25,10 +25,10 @@ def calculate_sha256(file_path):
 def record_metadata_to_firebase(title, description, sha256):
     try:
         ref = db.reference("podcasts")
-        existing_data = ref.get() or []  # Get existing data or initialize as an empty list
+        existing_data = ref.get() or []
 
         # Ensure the data is in list format
-        if isinstance(existing_data, dict):  
+        if isinstance(existing_data, dict):
             existing_data = list(existing_data.values())
 
         metadata = {
@@ -38,7 +38,7 @@ def record_metadata_to_firebase(title, description, sha256):
         }
 
         existing_data.append(metadata)
-        ref.set(existing_data)  # Save the updated list back to the database
+        ref.set(existing_data)
         logger.info(f"Metadata recorded to Firebase as array: {metadata}")
     except Exception as e:
         logger.error(f"Error recording metadata to Firebase: {e}")
@@ -56,28 +56,10 @@ def upload_to_firebase_storage(local_file_path, title, description):
 
         record_metadata_to_firebase(title, description, sha256_hash)
 
-        return sha256_hash, blob.public_url  # Return SHA256 hash and public URL of the file
+        return sha256_hash, blob.public_url
     except Exception as e:
         logger.error(f"Error uploading file to Firebase Storage: {e}")
         return None, None
-
-# Generate signed URL
-def generate_signed_url(bucket_name, blob_name, expiration_minutes=60):
-    try:
-        client = storage.Client()
-        bucket = client.bucket(bucket_name)
-        blob = bucket.blob(blob_name)
-
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(minutes=expiration_minutes),
-            method="GET"
-        )
-        logger.info(f"Signed URL generated: {url}")
-        return url
-    except Exception as e:
-        logger.error(f"Error generating signed URL: {e}")
-        return None
 
 def is_url_fetched(url):
     try:
@@ -114,7 +96,7 @@ def retry_github_action(action, max_retries=3):
             else:
                 raise e
 
-def process_articles(news_articles, website, client, output_folder):
+def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url = True):
     logger.info(f"Processing articles from {website}...")
     local_mp3_files = []
     local_all_summaries = []
@@ -167,7 +149,8 @@ def process_articles(news_articles, website, client, output_folder):
                 logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
 
                 local_all_summaries.append(article_summary)
-                add_url_to_fetched(url)
+                if need_add_to_fetched_url:
+                    add_url_to_fetched(url)
 
                 domain = extract_domain(website)
                 speech_file_path = Path(output_folder) / f"summary_{domain}_{idx + 1}.mp3"
@@ -191,7 +174,6 @@ def process_articles(news_articles, website, client, output_folder):
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
-# check serviceAccountKey exists
 if not os.path.exists("./serviceAccountKey.json"):
     raise ValueError("serviceAccountKey.json not found in the current directory.")  
 
@@ -213,6 +195,9 @@ reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d"
 coindesk_date = datetime.now().strftime("/%Y/%m/%d")
 coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("/%Y/%m/%d")
 coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("/%Y/%m/%d")
+
+# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
+use_scraping = False
 
 news_websites_crawl = {
     'https://www.reuters.com': {
@@ -238,44 +223,80 @@ news_websites_crawl = {
     }
 }
 
+news_websites_scraping = [
+    "https://www.qbitai.com/2024/12/229070.html",
+    "https://www.ithome.com/0/816/130.htm",
+    "https://mp.weixin.qq.com/s/KZtQYwMhdYUNVB1Cyu3AiQ",
+    "https://www.ithome.com/0/815/926.htm",
+    "https://www.ithome.com/0/816/320.htm",
+    "https://36kr.com/p/3071237074432648",
+    "https://www.ithome.com/0/816/142.htm",
+    "https://www.ithome.com/0/816/036.htm",
+    "https://www.ithome.com/0/816/040.htm",
+    "https://www.ithome.com/0/816/098.htm",
+    "https://www.ithome.com/0/815/958.htm",
+    "https://www.ithome.com/0/816/253.htm",
+    "https://mp.weixin.qq.com/s/XYuFuwtpslqHL3Vwe7B78w",
+    "https://www.ithome.com/0/816/077.htm",
+    "https://www.ithome.com/0/815/914.htm"
+]
+
 output_folder = "podcast_audio"
 os.makedirs(output_folder, exist_ok=True)
 
-logger.info("Starting to crawl, summarize, and generate audio for news websites...")
+logger.info("Starting to gather, summarize, and generate audio for news articles...")
 
 mp3_files = []
 all_summaries = []
 
-for website, rules in news_websites_crawl.items():
-    try:
-        logger.info(f"Crawling website: {website} with rules {rules}")
-        crawl_status = app.crawl_url(
-            website,
-            params={
-                'limit': rules['limit'],
-                'scrapeOptions': {'formats': ['markdown', 'html']},
-                'includePaths': rules['includePaths'],
-                'excludePaths': rules['excludePaths'],
-            },
-            poll_interval=1
-        )
+if use_scraping:
+    # 使用 scraping 的方式获取数据
+    for single_url in news_websites_scraping:
+        try:
+            domain = extract_domain(single_url)
+            logger.info(f"Scraping single URL: {single_url}")
+            scrape_result = app.scrape_url(single_url, params={'formats': ['markdown', 'html']})
+            if scrape_result:
+                # 构造与爬取数据类似的结构
+                news_articles = [scrape_result] if 'markdown' in scrape_result else []
+                logger.info(f"Found {len(news_articles)} articles from {single_url}.")
+                if news_articles:
+                    local_mp3_files, local_all_summaries = process_articles(news_articles, domain, client, output_folder, False)
+                    mp3_files.extend(local_mp3_files)
+                    all_summaries.extend(local_all_summaries)
+        except Exception as e:
+            logger.error(f"Error scraping {single_url}: {e}")
+else:
+    # 使用 crawling 的方式获取数据
+    for website, rules in news_websites_crawl.items():
+        try:
+            logger.info(f"Crawling website: {website} with rules {rules}")
+            crawl_status = app.crawl_url(
+                website,
+                params={
+                    'limit': rules['limit'],
+                    'scrapeOptions': {'formats': ['markdown', 'html']},
+                    'includePaths': rules['includePaths'],
+                    'excludePaths': rules['excludePaths'],
+                },
+                poll_interval=1
+            )
 
-        news_articles = crawl_status.get('data', [])
+            news_articles = crawl_status.get('data', [])
 
-        if not news_articles:
-            logger.warning(f"No news articles found in the crawl data for {website}.")
+            if not news_articles:
+                logger.warning(f"No news articles found in the crawl data for {website}.")
+                continue
+
+            logger.info(f"Found {len(news_articles)} articles from {website}.")
+
+            local_mp3_files, local_all_summaries = process_articles(news_articles, website, client, output_folder)
+            mp3_files.extend(local_mp3_files)
+            all_summaries.extend(local_all_summaries)
+
+        except Exception as e:
+            logger.error(f"Error while crawling {website}: {e}")
             continue
-
-        logger.info(f"Found {len(news_articles)} articles from {website}.")
-
-        # 调用整理出的函数
-        local_mp3_files, local_all_summaries = process_articles(news_articles, website, client, output_folder)
-        mp3_files.extend(local_mp3_files)
-        all_summaries.extend(local_all_summaries)
-
-    except Exception as e:
-        logger.error(f"Error while crawling {website}: {e}")
-        continue
 
 logger.info("Generating introduction for the podcast...")
 title = ""
