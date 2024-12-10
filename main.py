@@ -320,7 +320,8 @@ try:
     example_json = {
         "opening": "",
         "title": "",
-        "description": ""
+        "description": "",
+        "ending": ""
     }
     intro_prompt = f"""
     Please follow the following instructions to generate a podcast introduction:
@@ -334,6 +335,9 @@ try:
 
     description:
     Provide a one-sentence description for the podcast, Be a little more detailed, but no more than 200 words. 
+
+    the ending:
+    Provide a one-sentence ending for the podcast
 
     Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
 
@@ -377,6 +381,7 @@ try:
     opening = intro_data.get('opening', '欢迎收听今天的新闻播客，我们将为您带来最新的新闻动态。')
     title = intro_data.get('title', '今日新闻播客News~')
     description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
+    ending = intro_data.get('ending', '感谢您的收听，我们下期节目再见。')
 
     intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
     intro_tts_response = client.audio.speech.create(
@@ -388,6 +393,17 @@ try:
     intro_tts_response.stream_to_file(intro_audio_path)
     mp3_files.insert(0, intro_audio_path)
     logger.info(f"Introduction audio saved: {intro_audio_path}")
+
+    ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
+    ending_tts_response = client.audio.speech.create(
+        model="tts-1",
+        voice="echo",
+        speed=1.3,
+        input=ending
+    )
+    ending_tts_response.stream_to_file(ending_audio_path)
+    mp3_files.append(ending_audio_path)
+    logger.info(f"Ending audio saved: {ending_audio_path}")
 
 except Exception as e:
     logger.error(f"Error generating podcast introduction: {e}")
