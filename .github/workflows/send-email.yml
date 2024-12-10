@@ -1,0 +1,26 @@
+name: Notify by Email
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Send Email
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USER }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: GitHub Action Succeeded
+        body: Your GitHub Action has completed successfully!
+        to: ${{ secrets.EMAIL_TO }}
+        from: ${{ secrets.EMAIL_USER }}
