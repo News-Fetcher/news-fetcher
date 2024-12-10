@@ -14,6 +14,11 @@ import time
 import firebase_admin
 from firebase_admin import credentials, db, storage
 
+# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
+use_scraping = True
+# 如果 be_concise 为 True，则输出简洁的内容
+be_concise = True
+
 # 生成 SHA256 哈希
 def calculate_sha256(file_path):
     sha256_hash = hashlib.sha256()
@@ -211,11 +216,6 @@ def main():
     if not api_key_firecrawl:
         raise ValueError("Firecrawl API key not set in environment variables.")
     app = FirecrawlApp(api_key=api_key_firecrawl)
-
-    # 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-    use_scraping = True
-    # 如果 be_concise 为 True，则输出简洁的内容
-    be_concise = True
 
     # 动态生成日期
     reuters_date = datetime.now().strftime("%Y-%m-%d")
