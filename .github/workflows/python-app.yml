@@ -46,4 +46,17 @@ jobs:
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config }}
         run: python main.py
+
+      - name: Send mail
+        uses: dawidd6/action-send-mail@master
+        with:
+          server_address: smtp.163.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: Your Fetcher Action Complete
+          body: Congrautions!
+          to: 1216414009@qq.com
+          from: GitHub Actions
+          
     environment: Tim-s-News # 显式指定环境
