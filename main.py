@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from pydub import AudioSegment
 from openai import OpenAI
+import requests  # 导入 Requests 库
 from firecrawl import FirecrawlApp
 from datetime import datetime, timedelta
 from github import Github
@@ -32,7 +33,7 @@ def calculate_sha256(file_path):
     return sha256_hash.hexdigest()
 
 # 记录元数据到 Firebase Realtime Database
-def record_metadata_to_firebase(title, description, sha256):
+def record_metadata_to_firebase(title, description, sha256, img_url=None):
     try:
         ref = db.reference("podcasts")
         existing_data = ref.get() or []
@@ -47,6 +48,9 @@ def record_metadata_to_firebase(title, description, sha256):
             "sha256": sha256,
         }
 
+        if img_url:
+            metadata["img_url"] = img_url
+
         existing_data.append(metadata)
         ref.set(existing_data)
         logger.info(f"Metadata recorded to Firebase as array: {metadata}")
@@ -54,7 +58,7 @@ def record_metadata_to_firebase(title, description, sha256):
         logger.error(f"Error recording metadata to Firebase: {e}")
 
 # 上传最终播客到 Firebase Storage，并以 SHA256 作为文件名
-def upload_to_firebase_storage(local_file_path, title, description):
+def upload_to_firebase_storage(local_file_path, title, description, img_url):
     try:
         bucket = storage.bucket()
         sha256_hash = calculate_sha256(local_file_path)
@@ -64,7 +68,7 @@ def upload_to_firebase_storage(local_file_path, title, description):
         blob.upload_from_filename(local_file_path)
         logger.info(f"File uploaded to Firebase Storage: {storage_path}")
 
-        record_metadata_to_firebase(title, description, sha256_hash)
+        record_metadata_to_firebase(title, description, sha256_hash, img_url)
 
         return sha256_hash, blob.public_url
     except Exception as e:
@@ -319,7 +323,10 @@ def main():
                 continue
 
     logger.info("Generating introduction for the podcast...")
+
     title = ""
+    intro_data = {}
+    img_url = ""
 
     try:
         example_json = {
@@ -479,6 +486,60 @@ def main():
     except Exception as e:
         logger.error(f"Error committing podcast to GitHub: {e}")
 
+    # 开始生成博客封面图像并上传到 Firebase Storage
+    try:
+        # 从 intro_data 中提取标题和描述
+        title = intro_data.get('title', '未命名播客')
+        description = intro_data.get('description', '暂无描述。')
+
+        # 定义用于生成图像的提示语
+        image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description}。设计应现代、引人注目，适合新闻播客。"
+
+        logger.info(f"使用提示语生成博客封面图像：{image_prompt}")
+
+        # 使用 OpenAI 的 DALL·E 模型生成图像
+        intro_response = client.images.generate(
+            model="dall-e-3",
+            prompt=image_prompt,
+            n=1,
+            size="768x768",
+            response_format="url" 
+        )   
+
+        # 从响应中提取图像 URL
+        image_url = intro_response.data[0].url
+        logger.info(f"图像生成成功：{image_url}")
+
+        # 下载图像数据
+        image_data = requests.get(image_url).content
+        image_filename = f"{title.replace(' ', '_')}_cover.png"
+        image_path = Path(output_folder) / image_filename
+
+        # 将图像保存到本地
+        with open(image_path, 'wb') as f:
+            f.write(image_data)
+        logger.info(f"图像已下载并保存到本地：{image_path}")
+
+        # 上传图像到 Firebase Storage 的 'podcasts_image/' 文件夹
+        bucket = storage.bucket()
+        firebase_image_path = f"podcasts_image/{image_filename}"
+        blob = bucket.blob(firebase_image_path)
+        blob.upload_from_filename(image_path)
+        logger.info(f"图像已上传到 Firebase Storage：{firebase_image_path}")
+
+        # 使图像公开可访问，并获取公共 URL
+        blob.make_public()
+        img_url = blob.public_url
+        logger.info(f"图像的公共 URL：{img_url}")
+
+        # 可选：上传后删除本地图像文件以节省空间
+        os.remove(image_path)
+        logger.info(f"已删除本地图像文件：{image_path}")
+
+    except Exception as e:
+        logger.error(f"生成或上传博客封面图像时出错：{e}")
+        img_url = None  # 确保 img_url 变量在出错时有定义
+
     try:
         if mp3_files:
             combined_audio = AudioSegment.from_file(mp3_files[0])
@@ -489,7 +550,7 @@ def main():
             logger.info(f"Final podcast saved as: {final_podcast}")
 
             # 上传到 Firebase Storage
-            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description)
+            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description, img_url)
             if firebase_url:
                 logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
 
