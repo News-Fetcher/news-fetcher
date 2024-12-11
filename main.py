@@ -18,7 +18,7 @@ from firebase_admin import credentials, db, storage
 # 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
 use_scraping = True
 # 如果 be_concise 为 True，则输出简洁的内容
-be_concise = True
+be_concise = False
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
