@@ -493,7 +493,7 @@ def main():
         description = intro_data.get('description', '暂无描述。')
 
         # 定义用于生成图像的提示语
-        image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description}。设计应现代、引人注目，适合新闻播客。"
+        image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description}。设计应现代、引人注目，适合新闻播客。注意设计要体现平面设计美学，并且简约"
 
         logger.info(f"使用提示语生成博客封面图像：{image_prompt}")
 
@@ -502,7 +502,7 @@ def main():
             model="dall-e-3",
             prompt=image_prompt,
             n=1,
-            size="768x768",
+            size="1024x1024",
             response_format="url" 
         )   
 
