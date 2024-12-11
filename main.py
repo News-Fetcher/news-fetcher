@@ -502,7 +502,7 @@ def main():
             model="dall-e-3",
             prompt=image_prompt,
             n=1,
-            size="512x512",
+            size="1024x1024",
             response_format="url" 
         )   
 
