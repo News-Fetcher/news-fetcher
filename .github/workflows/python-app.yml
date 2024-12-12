@@ -60,7 +60,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: Your Fetcher Action Complete
           body: Congrautions!
-          to: 1216414009@qq.com
+          to: ${{ github.event.inputs.email }}
           from: GitHub Actions
           
     environment: Tim-s-News # 显式指定环境
