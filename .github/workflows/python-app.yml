@@ -8,6 +8,10 @@ on:
         description: 'News Websites Scraping 配置 (JSON 格式)'
         required: false
         default: '{}' # 默认空 JSON 对象
+      email:
+        description: 'Email'
+        required: false
+        default: '1216414009@qq.com'  
   schedule:
     - cron: "0 1 * * *" 
   # 保留手动触发
