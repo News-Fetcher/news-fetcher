@@ -46,6 +46,7 @@ def record_metadata_to_firebase(title, description, sha256, img_url=None, tags=[
             "description": description,
             "sha256": sha256,
             "tags": tags, 
+            "date": datetime.now().strftime("%Y-%m-%d"), 
         }
 
         if img_url:
@@ -503,7 +504,7 @@ def main():
             logger.info(f"Final podcast saved as: {final_podcast}")
 
             # 上传到 Firebase Storage
-            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description, img_url, tags)
+            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, title, description, img_url, tags)
             if firebase_url:
                 logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
 
