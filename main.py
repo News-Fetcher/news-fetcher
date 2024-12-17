@@ -122,7 +122,7 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
             url = meta_data.get('sourceURL', '')
 
             if be_concise:
-                summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very concise" 
+                summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very very concise" 
             else:
                 summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
 
@@ -146,7 +146,7 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
                             "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。 \
                                         在回答问题时，使用简洁、有条理、流畅且富有感染力的语言风格。 \
                                         确保语气专业、清晰且富有吸引力，适合公众广播或播客节目。\
-                                        总结新闻的时候，先说类似“接下来的这则（来自xxx网站）新闻讲的是/描述了...” 之类的，\
+                                        总结新闻的时候，先说类似“接下来是一则（来自xxx网站）的新闻，...”，\
                                         引出接下来的内容, "
                         },
                         {
@@ -446,7 +446,7 @@ def main():
         description = intro_data.get('description', '暂无描述。')
 
         # 定义用于生成图像的提示语
-        image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description}。设计应现代、引人注目，适合新闻播客。"
+        image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description} 设计应现代、引人注目，适合新闻播客。注意内容不要太过杂乱，简洁"
 
         logger.info(f"使用提示语生成博客封面图像：{image_prompt}")
 
@@ -455,7 +455,7 @@ def main():
             model="dall-e-3",
             prompt=image_prompt,
             n=1,
-            size="768x768",
+            size="1024x1024",
             response_format="url" 
         )   
 
