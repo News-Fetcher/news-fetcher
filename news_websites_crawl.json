@@ -1,6 +1,6 @@
 {
   "https://www.reuters.com": {
-      "limit": 4,
+      "limit": 24,
       "includePaths": [],
       "excludePaths": [
           "wrapup",
@@ -8,7 +8,7 @@
       ]
   },
   "https://www.coindesk.com": {
-      "limit": 4,
+      "limit": 24,
       "includePaths": [],
       "excludePaths": []
   }
