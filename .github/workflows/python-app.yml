@@ -1,5 +1,5 @@
 # .github/workflows/main.yml
-name: ${{ github.event.inputs.name || 'Podcast Generator Workflow' }}
+name: 'Podcast Generator Workflow'
 
 on:
   workflow_dispatch:
