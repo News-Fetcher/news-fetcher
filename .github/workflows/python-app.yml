@@ -8,6 +8,10 @@ on:
         description: 'News Websites Scraping 配置 (JSON 格式)'
         required: false
         default: '{}' # 默认空 JSON 对象
+      trigger_name:
+        description: 'Trigger Name for the Workflow'
+        required: false
+        default: 'Default Trigger Name' # 默认触发名称
   schedule:
     - cron: "0 1 * * *" 
   # 保留手动触发
@@ -15,6 +19,9 @@ on:
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
+
+    env:
+      WORKFLOW_TRIGGER_NAME: ${{ github.event.inputs.trigger_name || 'Default Trigger Name' }}
 
     steps:
       - name: Checkout repository
@@ -56,9 +63,9 @@ jobs:
           server_port: 465
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: Your Fetcher Action Complete
-          body: Congrautions!
+          subject: ${{ env.WORKFLOW_TRIGGER_NAME }} - Fetcher Action Complete
+          body: Congratulations!
           to: 1216414009@qq.com
           from: GitHub Actions
-          
+
     environment: Tim-s-News # 显式指定环境
