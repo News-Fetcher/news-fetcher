@@ -9,7 +9,6 @@ from openai import OpenAI
 import requests  # 导入 Requests 库
 from firecrawl import FirecrawlApp
 from datetime import datetime, timedelta
-from github import Github
 import json
 import time
 import firebase_admin
@@ -33,7 +32,7 @@ def calculate_sha256(file_path):
     return sha256_hash.hexdigest()
 
 # 记录元数据到 Firebase Realtime Database
-def record_metadata_to_firebase(title, description, sha256, img_url=None):
+def record_metadata_to_firebase(title, description, sha256, img_url=None, tags=[]):
     try:
         ref = db.reference("podcasts")
         existing_data = ref.get() or []
@@ -46,6 +45,7 @@ def record_metadata_to_firebase(title, description, sha256, img_url=None):
             "title": title,
             "description": description,
             "sha256": sha256,
+            "tags": tags, 
         }
 
         if img_url:
@@ -58,7 +58,7 @@ def record_metadata_to_firebase(title, description, sha256, img_url=None):
         logger.error(f"Error recording metadata to Firebase: {e}")
 
 # 上传最终播客到 Firebase Storage，并以 SHA256 作为文件名
-def upload_to_firebase_storage(local_file_path, title, description, img_url):
+def upload_to_firebase_storage(local_file_path, title, description, img_url, tags):
     try:
         bucket = storage.bucket()
         sha256_hash = calculate_sha256(local_file_path)
@@ -68,7 +68,7 @@ def upload_to_firebase_storage(local_file_path, title, description, img_url):
         blob.upload_from_filename(local_file_path)
         logger.info(f"File uploaded to Firebase Storage: {storage_path}")
 
-        record_metadata_to_firebase(title, description, sha256_hash, img_url)
+        record_metadata_to_firebase(title, description, sha256_hash, img_url, tags)
 
         return sha256_hash, blob.public_url
     except Exception as e:
@@ -99,16 +99,6 @@ def extract_domain(url):
     if match:
         return match.group(1)
     return "unknown_domain"
-
-def retry_github_action(action, max_retries=3):
-    for attempt in range(max_retries):
-        try:
-            return action()
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)
-            else:
-                raise e
 
 def process_articles(news_articles, website, client, output_folder, need_add_to_fetched_url=True, need_skip_same_url=True):
     logger.info(f"Processing articles from {website}...")
@@ -327,13 +317,18 @@ def main():
     title = ""
     intro_data = {}
     img_url = ""
+    tags = []
 
     try:
+        response = requests.get("https://gettags-a6lubplbza-uc.a.run.app")
+        response.raise_for_status()  # 检查请求是否成功（状态码 200）
+        history_tags = response.json()
         example_json = {
             "opening": "",
             "title": "",
             "description": "",
-            "ending": ""
+            "ending": "", 
+            "tags": ["tag1", "tag2", "tag3"]
         }
         intro_prompt = f"""
         Please follow the following instructions to generate a podcast introduction:
@@ -350,6 +345,11 @@ def main():
 
         the ending:
         Provide a one-sentence ending for the podcast
+
+        the tags: 
+        Extract the most relevant keywords to represent the content direction of this podcast in a JSON array format, 
+        returning no more than 4 keywords, and do not include sentences, only words. Historical tags can be referenced 
+        but should not be limited to them. Historical tags: {', '.join(history_tags)}
 
         Here is a JSON structure for your podcast introduction that includes the opening, title, and one-sentence description:
 
@@ -394,6 +394,7 @@ def main():
         title = intro_data.get('title', '今日新闻播客News~')
         description = intro_data.get('description', '这是一个关于今日新闻的播客，涵盖了重要的新闻事件。')
         ending = intro_data.get('ending', '感谢您的收听，我们下期节目再见。')
+        tags = intro_data.get('tags', [])
 
         intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
         intro_tts_response = client.audio.speech.create(
@@ -437,54 +438,6 @@ def main():
             logger.warning("No audio files were generated to merge.")
     except Exception as e:
         logger.error(f"Error combining MP3 files: {e}")
-
-    logger.info("Committing the final podcast to GitHub...")
-    GH_ACCESS_TOKEN = os.getenv("GH_ACCESS_TOKEN")
-    if not GH_ACCESS_TOKEN:
-        raise ValueError("GitHub access token not set in environment variables.")
-
-    REPO_NAME = "nagisa77/posts"
-    COMMIT_FILE_PATH = f"podcasts/{podcast_name}"
-
-    try:
-        g = Github(GH_ACCESS_TOKEN)
-        repo = g.get_repo(REPO_NAME)
-
-        branch_name = "main"
-        try:
-            repo.get_branch(branch_name)
-        except Exception:
-            repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=repo.get_branch("master").commit.sha)
-
-        if os.path.getsize(final_podcast) > 100 * 1024 * 1024:
-            raise ValueError("File size too large for GitHub commit.")
-
-        with open(final_podcast, "rb") as podcast_file:
-            content = podcast_file.read()
-
-        def commit_action():
-            try:
-                existing_file = repo.get_contents(COMMIT_FILE_PATH, ref=branch_name)
-                return repo.update_file(
-                    COMMIT_FILE_PATH,
-                    f"Update podcast for {today_date}",
-                    content,
-                    existing_file.sha,
-                    branch=branch_name
-                )
-            except:
-                return repo.create_file(
-                    COMMIT_FILE_PATH,
-                    f"Add podcast for {today_date}",
-                    content,
-                    branch=branch_name
-                )
-
-        retry_github_action(commit_action)
-        logger.info(f"Podcast committed successfully to GitHub: {COMMIT_FILE_PATH}")
-
-    except Exception as e:
-        logger.error(f"Error committing podcast to GitHub: {e}")
 
     # 开始生成博客封面图像并上传到 Firebase Storage
     try:
@@ -550,7 +503,7 @@ def main():
             logger.info(f"Final podcast saved as: {final_podcast}")
 
             # 上传到 Firebase Storage
-            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description, img_url)
+            firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, podcast_name, description, img_url, tags)
             if firebase_url:
                 logger.info(f"Podcast uploaded to Firebase Storage successfully: {firebase_url}")
 
