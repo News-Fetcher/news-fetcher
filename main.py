@@ -14,14 +14,13 @@ import time
 import firebase_admin
 from firebase_admin import credentials, db, storage
 
-# 如果 use_scraping 为 True，则直接使用 scrape_url，不使用 crawl_url
-use_scraping = True
-# 如果 be_concise 为 True，则输出简洁的内容
-be_concise = False
-
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
+
+logger.info(f"BE_CONCISE: {os.getenv('BE_CONCISE')}")
+logger.info(f"FETCHER_METHOD: {os.getenv('FETCHER_METHOD')}")
+logger.info(f"SCRAPING_CONFIG: {os.getenv('SCRAPING_CONFIG')}")
 
 # 生成 SHA256 哈希
 def calculate_sha256(file_path):
@@ -122,7 +121,7 @@ def process_articles(news_articles, website, client, output_folder, need_add_to_
             title = meta_data.get('title', '')
             url = meta_data.get('sourceURL', '')
 
-            if be_concise:
+            if os.getenv("BE_CONCISE") == "true":
                 summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very very concise" 
             else:
                 summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
@@ -250,7 +249,7 @@ def main():
     mp3_files = []
     all_summaries = []
 
-    if use_scraping:
+    if os.getenv("FETCHER_METHOD") == "scraping":
         # 使用 scraping 的方式获取数据
         for single_url in news_websites_scraping:
             try:
@@ -266,7 +265,7 @@ def main():
                         all_summaries.extend(local_all_summaries)
             except Exception as e:
                 logger.error(f"Error scraping {single_url}: {e}")
-    else:
+    elif os.getenv("FETCHER_METHOD") == "crawling":
         # 使用 crawling 的方式获取数据
         for website, rules in news_websites_crawl.items():
             # 根据网站动态生成包含的路径日期

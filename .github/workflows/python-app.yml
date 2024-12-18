@@ -4,18 +4,22 @@ name: 'Podcast Generator Workflow'
 on:
   workflow_dispatch:
     inputs:
-      name:
-        description: 'Name for the workflow'
+      method:
+        description: 'Method for news fetcher'
         required: false
-        default: 'Podcast Generator Workflow'  # Default name for manual trigger
+        default: 'crawling'
       scraping_config:
-        description: 'News Websites Scraping 配置 (JSON 格式)'
+        description: 'News Websites config'
         required: false
-        default: '{}' # 默认空 JSON 对象
+        default: '{}'
       email:
         description: 'Email'
         required: false
         default: '1216414009@qq.com'  
+      be_concise:
+        description: 'Be concise'
+        required: false
+        default: 'true'
   schedule:
     - cron: "0 1 * * *" 
   # 保留手动触发
@@ -55,6 +59,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config }}
+          FETCHER_METHOD: ${{ github.event.inputs.method }}
+          BE_CONCISE: ${{ github.event.inputs.be_concise }}
         run: python main.py
 
       - name: Send mail

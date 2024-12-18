@@ -61,6 +61,9 @@ def main():
     email = "1216414009@qq.com"  # You can modify this email address as needed
     websites_file = "./websites.txt"
 
+    method = "scraping"  
+    be_concise = True  
+
     try:
         # Read the list of websites
         websites = read_websites(websites_file)
@@ -69,7 +72,9 @@ def main():
         # Construct the payload
         payload = {
             "news_websites_scraping": websites,
-            "email": email
+            "email": email,
+            "method": method,
+            "be_concise": be_concise
         }
 
         # Send the POST request
