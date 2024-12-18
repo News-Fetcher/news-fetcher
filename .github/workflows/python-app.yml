@@ -8,18 +8,23 @@ on:
         description: 'Method for news fetcher'
         required: false
         default: 'crawling'
+        type: string
       scraping_config:
         description: 'News Websites config'
         required: false
         default: '{}'
+        type: string
       email:
         description: 'Email'
         required: false
         default: '1216414009@qq.com'  
+        type: string
       be_concise:
         description: 'Be concise'
         required: false
-        default: 'true'
+        default: true
+        type: boolean
+
   schedule:
     - cron: "0 1 * * *" 
   # 保留手动触发
