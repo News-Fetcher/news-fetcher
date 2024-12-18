@@ -61,7 +61,7 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: Your Fetcher Action Complete
-          body: Congrautions!
+          body: Congrautions! You can visit https://www.chenjiating.com/news-fetcher-platform to check.
           to: 1216414009@qq.com
           from: GitHub Actions
           
