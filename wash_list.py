@@ -149,7 +149,8 @@ def main():
 
         # 生成标签
         description = podcast.get("description", "")
-        podcast["tags"] = generate_tags_by_description(description, historical_tags)
+        if "tags" not in podcast or not podcast["tags"]:
+            podcast["tags"] = generate_tags_by_description(description, historical_tags)
 
     with open("list_to_wash_processed.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)

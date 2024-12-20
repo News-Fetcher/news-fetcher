@@ -6,13 +6,14 @@ import hashlib
 from pathlib import Path
 from pydub import AudioSegment
 from openai import OpenAI
-import requests  # 导入 Requests 库
+import requests  
 from firecrawl import FirecrawlApp
 from datetime import datetime, timedelta
 import json
 import time
 import firebase_admin
 from firebase_admin import credentials, db, storage
+import uuid  
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -465,7 +466,8 @@ def main():
 
         # 下载图像数据
         image_data = requests.get(image_url).content
-        image_filename = f"{title.replace(' ', '_')}_cover.png"
+        image_filename = f"{title.replace(' ', '_')}_{uuid.uuid4().hex}_cover.png"        
+        logger.info(f"生成的图像文件名：{image_filename}")
         image_path = Path(output_folder) / image_filename
 
         # 将图像保存到本地
