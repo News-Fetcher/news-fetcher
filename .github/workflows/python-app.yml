@@ -1,4 +1,3 @@
-# .github/workflows/main.yml
 name: 'Podcast Generator Workflow'
 
 on:
@@ -27,7 +26,6 @@ on:
 
   schedule:
     - cron: "0 1 * * *" 
-  # 保留手动触发
 
 jobs:
   build-and-run:
@@ -40,7 +38,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10" # Python 版本
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
@@ -63,9 +61,9 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-          SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config }}
-          FETCHER_METHOD: ${{ github.event.inputs.method }}
-          BE_CONCISE: ${{ github.event.inputs.be_concise }}
+          SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
+          FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
+          BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
         run: python main.py
 
       - name: Send mail
@@ -76,8 +74,8 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: Your Fetcher Action Complete
-          body: Congrautions! You can visit https://www.chenjiating.com/news-fetcher-platform to check.
-          to: ${{ github.event.inputs.email }}
+          body: Congratulations! You can visit https://www.chenjiating.com/news-fetcher-platform to check.
+          to: ${{ github.event.inputs.email || '1216414009@qq.com' }}
           from: GitHub Actions
-          
-    environment: Tim-s-News # 显式指定环境
+
+    environment: Tim-s-News 
