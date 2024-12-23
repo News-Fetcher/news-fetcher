@@ -498,13 +498,6 @@ def main():
 
     try:
         if mp3_files:
-            combined_audio = AudioSegment.from_file(mp3_files[0])
-            for mp3_file in mp3_files[1:]:
-                combined_audio += AudioSegment.from_file(mp3_file)
-
-            combined_audio.export(final_podcast, format="mp3")
-            logger.info(f"Final podcast saved as: {final_podcast}")
-
             # 上传到 Firebase Storage
             firebase_hash, firebase_url = upload_to_firebase_storage(final_podcast, title, description, img_url, tags)
             if firebase_url:
