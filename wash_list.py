@@ -4,15 +4,25 @@ import os
 from openai import OpenAI
 import logging
 from pathlib import Path
-import requests  
+import requests
 import time
 import firebase_admin
 from firebase_admin import credentials, db, storage
+from mutagen.mp3 import MP3
+from io import BytesIO  # 用于处理内存中的MP3数据
 
 # 设置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 client = OpenAI()
+
+# 新增标志位
+WASH_IMAGES = False           # 本次是否wash图片
+WASH_TAGS = True            # 本次是否wash tags
+WASH_TOTAL_DURATION = True  # 本次是否wash total_duration
+
+# MP3文件的基础URL
+MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
 
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
     """
@@ -90,7 +100,7 @@ def generate_tags_by_description(description, historical_tags):
     )
     content = completion.choices[0].message.content.strip()
 
-    if content.strip().startswith("{") and content.strip().endswith("}"):
+    if content.strip().startswith("[") and content.strip().endswith("]"):
         cleaned_json = content.strip()
     elif "```json" in content:
         match = re.search(r"```json(.*?)```", content, re.DOTALL)
@@ -102,7 +112,12 @@ def generate_tags_by_description(description, historical_tags):
         cleaned_json = content.strip()
 
     logging.info(f"生成的标签: {cleaned_json}")
-    tags = json.loads(cleaned_json)
+    try:
+        tags = json.loads(cleaned_json)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON解析错误: {e}")
+        tags = []
+    
     tags = tags[:4]
 
     for tag in tags:
@@ -111,6 +126,22 @@ def generate_tags_by_description(description, historical_tags):
 
     logging.info(f"生成的最终标签列表: {tags}")
     return tags
+
+def calculate_mp3_duration(mp3_url):
+    """
+    通过URL下载MP3文件并计算其时长（秒）。
+    """
+    try:
+        logger.info(f"正在下载MP3文件：{mp3_url}")
+        response = requests.get(mp3_url, timeout=10)
+        response.raise_for_status()
+        audio = MP3(BytesIO(response.content))
+        duration = int(audio.info.length)
+        logger.info(f"MP3文件 {mp3_url} 的时长为 {duration} 秒")
+        return duration
+    except Exception as e:
+        logger.error(f"无法计算MP3文件 {mp3_url} 的时长，错误：{e}")
+        return None
 
 def main():
     logging.info("开始处理播客列表...")
@@ -143,14 +174,27 @@ def main():
         podcast["title"] = cleaned_title
         logging.info(f"清理后的标题: {cleaned_title}")
 
-        # 若缺img_url则生成
-        if "img_url" not in podcast:
+        # 若缺img_url且WASH_IMAGES为True则生成
+        if WASH_IMAGES and "img_url" not in podcast:
             podcast["img_url"] = generate_img_url(cleaned_title, podcast.get("description", ""))
 
         # 生成标签
         description = podcast.get("description", "")
-        if "tags" not in podcast or not podcast["tags"]:
+        if WASH_TAGS and ("tags" not in podcast or not podcast["tags"]):
             podcast["tags"] = generate_tags_by_description(description, historical_tags)
+
+        # 计算 total_duration
+        if WASH_TOTAL_DURATION and "total_duration" not in podcast:
+            # 构造MP3文件的下载URL
+            filename = podcast.get("sha256", "")
+            if filename:
+                mp3_url = f"{MP3_BASE_URL}{filename}.mp3"
+                duration = calculate_mp3_duration(mp3_url)
+                if duration is not None:
+                    podcast["total_duration"] = duration
+                    logger.info(f"播客 {cleaned_title} 的 total_duration 计算成功: {duration} 秒")
+            else:
+                logger.warning(f"播客 {cleaned_title} 缺少 sha256 字段，无法构造MP3 URL。")
 
     with open("list_to_wash_processed.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
