@@ -32,7 +32,7 @@ def calculate_sha256(file_path):
     return sha256_hash.hexdigest()
 
 # 记录元数据到 Firebase Realtime Database
-def record_metadata_to_firebase(title, description, sha256, img_url=None, tags=[]):
+def record_metadata_to_firebase(title, description, sha256, img_url=None, tags=[], total_duration=None):
     try:
         ref = db.reference("podcasts")
         existing_data = ref.get() or []
@@ -46,11 +46,14 @@ def record_metadata_to_firebase(title, description, sha256, img_url=None, tags=[
             "description": description,
             "sha256": sha256,
             "tags": tags, 
-            "date": datetime.now().strftime("%Y-%m-%d"), 
+            "date": datetime.now().strftime("%Y-%m-%d"),
         }
 
         if img_url:
             metadata["img_url"] = img_url
+
+        if total_duration is not None:
+            metadata["total_duration"] = total_duration  # 添加总时长字段
 
         existing_data.append(metadata)
         ref.set(existing_data)
@@ -69,7 +72,10 @@ def upload_to_firebase_storage(local_file_path, title, description, img_url, tag
         blob.upload_from_filename(local_file_path)
         logger.info(f"File uploaded to Firebase Storage: {storage_path}")
 
-        record_metadata_to_firebase(title, description, sha256_hash, img_url, tags)
+        audio = AudioSegment.from_file(local_file_path)
+        duration_seconds = len(audio) / 1000  # pydub 返回毫秒
+
+        record_metadata_to_firebase(title, description, sha256_hash, img_url, tags, duration_seconds)
 
         return sha256_hash, blob.public_url
     except Exception as e:
