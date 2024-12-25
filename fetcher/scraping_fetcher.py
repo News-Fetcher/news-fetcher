@@ -11,6 +11,7 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     返回一个所有文章对象组成的列表，每个元素都应包含必要的 'markdown', 'metadata' 字段。
     """
     api_key_firecrawl = os.getenv("FIRECRAWL_API_KEY")
+    logger.info(f"api_key_firecrawl: {api_key_firecrawl}")
     if not api_key_firecrawl:
         raise ValueError("Firecrawl API key not set in environment variables.")
 

@@ -14,6 +14,7 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
     返回一个列表，内部是所有网站的所有文章。
     """
     api_key_firecrawl = os.getenv("FIRECRAWL_API_KEY")
+    logger.info(f"api_key_firecrawl: {api_key_firecrawl}")
     if not api_key_firecrawl:
         raise ValueError("Firecrawl API key not set in environment variables.")
 

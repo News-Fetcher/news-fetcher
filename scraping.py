@@ -62,7 +62,7 @@ def main():
     websites_file = "./websites.txt"
 
     method = "scraping"  
-    be_concise = True  
+    be_concise = False   
 
     try:
         # Read the list of websites
