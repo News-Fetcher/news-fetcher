@@ -58,7 +58,7 @@ def main():
     headers = {
         "Content-Type": "application/json"
     }
-    email = "1216414009@qq.com"  # You can modify this email address as needed
+    email = "cjt807916@gmail.com"  # You can modify this email address as needed
     websites_file = "./websites.txt"
 
     method = "scraping"  
