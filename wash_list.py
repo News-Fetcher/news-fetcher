@@ -95,7 +95,7 @@ def generate_tags_by_description(description, historical_tags):
     """
     completion = exponential_backoff_retry(
         client.chat.completions.create,
-        model="gpt-4o-mini-2024-07-18",
+        model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
     content = completion.choices[0].message.content.strip()

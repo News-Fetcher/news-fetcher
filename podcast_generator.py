@@ -59,7 +59,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
         # 调用 GPT 进行摘要
         try:
             article_response = client.chat.completions.create(
-                model="gpt-4o-mini-2024-07-18",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
@@ -161,7 +161,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
         """
 
         intro_response = client.chat.completions.create(
-            model="gpt-4o-mini-2024-07-18",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"},
                 {"role": "user", "content": intro_prompt}
