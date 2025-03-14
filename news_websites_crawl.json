@@ -1,14 +1,6 @@
 {
-  "https://www.reuters.com": {
-      "limit": 11,
-      "includePaths": [],
-      "excludePaths": [
-          "wrapup",
-          "podcasts"
-      ]
-  },
   "https://www.coindesk.com": {
-      "limit": 11,
+      "limit": 20,
       "includePaths": [],
       "excludePaths": []
   }
