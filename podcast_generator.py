@@ -7,6 +7,7 @@ import requests
 import logging
 import hashlib
 from pathlib import Path
+import tiktoken
 from datetime import datetime
 from openai import OpenAI
 from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_firebase_storage
