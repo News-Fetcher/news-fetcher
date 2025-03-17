@@ -3,3 +3,4 @@ pydub
 firecrawl
 pygithub
 firebase_admin
+tiktoken

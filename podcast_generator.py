@@ -15,12 +15,73 @@ from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
+# 获取模型编码，用于计算 tokens
+def num_tokens_from_string(string: str, model_name: str = "gpt-4") -> int:
+    """
+    计算给定文本在指定模型下的 token 数量
+    注意：gpt-4o 自定义模型可能需要换成类似 gpt-3.5-turbo 或别的可识别模型名称
+    """
+    try:
+        encoding = tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        # 如果自定义模型不被识别，就用一个通用编码器
+        encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(string))
+
+def safe_chat_completion_create(
+    client, model, messages, max_retries=3, initial_delay=1.0, max_tokens=2048
+):
+    """
+    包装对 chat.completions.create 的调用，
+    - 做指数退避，避免频繁 429
+    - 可以指定 max_tokens 以限制返回大小
+    """
+    delay = initial_delay
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens  # 注意根据需要设置
+            )
+            return response
+        except Exception as e:
+            err_msg = str(e)
+            # 如果是 429 或者其他速率限制相关信息，做退避重试
+            if "429" in err_msg or "rate_limit" in err_msg:
+                logger.warning(f"Got 429/rate limit error: {err_msg}, retry in {delay} s")
+                time.sleep(delay)
+                delay *= 2  # 指数退避
+            else:
+                # 其他错误直接抛出
+                raise e
+
+    # 超过最大重试次数，抛出异常
+    raise RuntimeError("Max retries exceeded for chat.completions.create()")
+
+
+def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_name: str = "gpt-4"):
+    """
+    简单截断方式：确保 prompt 的 token 总数不超过 max_prompt_tokens
+    若超过则直接把末尾砍掉。
+    更复杂的场景可以考虑分块总结。
+    """
+    tokens = num_tokens_from_string(prompt_text, model_name)
+    if tokens <= max_prompt_tokens:
+        return prompt_text
+
+    # 如果过长，就做简单截断
+    truncated = prompt_text
+    while tokens > max_prompt_tokens:
+        truncated = truncated[:-200]  # 每次砍掉一定字符，避免循环次数过多
+        tokens = num_tokens_from_string(truncated, model_name)
+
+    # 可选：给截断内容加个提示
+    truncated += "\n\n(以上内容已被截断)..."
+    return truncated
+
 
 def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=False):
-    """
-    遍历 news_articles，调用 GPT 模型获取摘要，并调用 TTS 生成音频文件；
-    返回生成的 mp3 文件路径列表，以及所有文章的摘要列表。
-    """
     local_mp3_files = []
     all_summaries = []
 
@@ -47,19 +108,28 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
 
         single_article_prompt = f"""
-            {summary_require_prompt}
+        {summary_require_prompt}
 
-            Article Title: {title}
-            Article URL: {url}
+        Article Title: {title}
+        Article URL: {url}
 
-            Article Content:
-            {markdown_content}
-            """
+        Article Content:
+        {markdown_content}
+        """
 
-        # 调用 GPT 进行摘要
+        # ========== 新增：截断处理，假设我们想让 prompt + 回答 <= 8000 tokens, 其中回答max 2048 tokens => prompt部分留 5000 tokens 左右 ==========
+        truncated_prompt = truncate_text_to_fit_model(
+            single_article_prompt,
+            max_prompt_tokens=5000,   # 这里可根据需要调整
+            model_name="gpt-4o"       # 如果你用 "gpt-3.5-turbo" 或其它，请根据实际情况修改
+        )
+        # =================================================================================================
+
         try:
-            article_response = client.chat.completions.create(
-                model="gpt-4o",
+            # ========== 新增：使用 safe_chat_completion_create，带重试 + 限制max_tokens ==========
+            article_response = safe_chat_completion_create(
+                client=client,
+                model="gpt-4o",       # 你自己使用的实际模型名称
                 messages=[
                     {
                         "role": "system",
@@ -71,10 +141,15 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
                     },
                     {
                         "role": "user",
-                        "content": single_article_prompt,
+                        "content": truncated_prompt,
                     }
-                ]
+                ],
+                max_retries=3,
+                initial_delay=1.0,
+                max_tokens=2048  # 对生成结果做一个上限, 防止太长
             )
+            # ============================================================================================
+
             article_summary = article_response.choices[0].message.content
             logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
 
