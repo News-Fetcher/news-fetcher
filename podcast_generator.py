@@ -163,12 +163,15 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             safe_domain = re.sub(r'[^\w.-]', '_', domain)
             filename = f"summary_{safe_domain}_{url_hash}.mp3"
             speech_file_path = Path(output_folder) / filename
+            instructions = """温柔，语速较快，性感的博客小姐姐声音"""
 
             tts_response = client.audio.speech.create(
-                model="tts-1",
-                voice="echo",
+                model="gpt-4o-mini-tts",
+                voice="coral",
                 speed=1.3,
-                input=article_summary
+                input=article_summary,
+                instructions=instructions,
+                response_format="pcm",
             )
             tts_response.stream_to_file(speech_file_path)
             local_mp3_files.append(speech_file_path)
