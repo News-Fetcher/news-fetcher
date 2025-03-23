@@ -167,11 +167,10 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
 
             tts_response = client.audio.speech.create(
                 model="gpt-4o-mini-tts",
-                voice="coral",
+                voice="sage",
                 speed=1.3,
                 input=article_summary,
                 instructions=instructions,
-                response_format="pcm",
             )
             tts_response.stream_to_file(speech_file_path)
             local_mp3_files.append(speech_file_path)
@@ -262,23 +261,26 @@ def generate_intro_ending(all_summaries, client, output_folder):
 
         intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
         ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
+        instructions = """语气非常非常轻，非常温柔, 轻柔, 有一种温柔姐姐, 睡前讲故事的感觉, 轻到几乎只有气流声"""
 
         # 开场白音频
         intro_tts_response = client.audio.speech.create(
-            model="tts-1",
-            voice="echo",
+            model="gpt-4o-mini-tts",
+            voice="sage",
             speed=1.3,
-            input=opening
+            input=opening,
+            instructions=instructions,
         )
         intro_tts_response.stream_to_file(intro_audio_path)
         mp3_files.append(intro_audio_path)
-
+        instructions = """语气非常非常轻，非常温柔, 轻柔, 有一种温柔姐姐, 睡前讲故事的感觉, 轻到几乎只有气流声"""
         # 结束语音频
         ending_tts_response = client.audio.speech.create(
-            model="tts-1",
-            voice="echo",
+            model="gpt-4o-mini-tts",
+            voice="sage",
             speed=1.3,
-            input=ending
+            input=ending,
+            instructions=instructions,
         )
         ending_tts_response.stream_to_file(ending_audio_path)
         mp3_files.append(ending_audio_path)

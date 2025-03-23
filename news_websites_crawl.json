@@ -1,6 +1,6 @@
 {
   "https://www.coindesk.com": {
-      "limit": 1,
+      "limit": 20,
       "includePaths": [],
       "excludePaths": []
   }
