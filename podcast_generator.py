@@ -121,7 +121,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
         # ========== 新增：截断处理，假设我们想让 prompt + 回答 <= 8000 tokens, 其中回答max 2048 tokens => prompt部分留 5000 tokens 左右 ==========
         truncated_prompt = truncate_text_to_fit_model(
             single_article_prompt,
-            max_prompt_tokens=5000,   # 这里可根据需要调整
+            max_prompt_tokens=20000,   # 这里可根据需要调整
             model_name="gpt-4o"       # 如果你用 "gpt-3.5-turbo" 或其它，请根据实际情况修改
         )
         # =================================================================================================
