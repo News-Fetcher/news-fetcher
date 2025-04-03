@@ -23,7 +23,7 @@ domain = extract_domain(url)
 safe_domain = re.sub(r'[^\w.-]', '_', domain)
 filename = f"summary_{safe_domain}_{url_hash}.mp3"
 speech_file_path = Path(output_folder) / filename
-instructions = """语气非常非常轻，非常温柔, 轻柔, 有一种温柔姐姐, 睡前讲故事的感觉, 轻到几乎只有气流声"""
+instructions = """播客，效率高，语速快"""
 
 tts_response = client.audio.speech.create(
     model="gpt-4o-mini-tts",

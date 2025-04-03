@@ -163,7 +163,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             safe_domain = re.sub(r'[^\w.-]', '_', domain)
             filename = f"summary_{safe_domain}_{url_hash}.mp3"
             speech_file_path = Path(output_folder) / filename
-            instructions = """温柔，语速较快，性感的博客小姐姐声音"""
+            instructions = """播客，效率高，语速快"""
 
             tts_response = client.audio.speech.create(
                 model="gpt-4o-mini-tts",
@@ -261,7 +261,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
 
         intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
         ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
-        instructions = """语气非常非常轻，非常温柔, 轻柔, 有一种温柔姐姐, 睡前讲故事的感觉, 轻到几乎只有气流声"""
+        instructions = """播客，效率高，语速快"""
 
         # 开场白音频
         intro_tts_response = client.audio.speech.create(
@@ -273,7 +273,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
         )
         intro_tts_response.stream_to_file(intro_audio_path)
         mp3_files.append(intro_audio_path)
-        instructions = """语气非常非常轻，非常温柔, 轻柔, 有一种温柔姐姐, 睡前讲故事的感觉, 轻到几乎只有气流声"""
+        instructions = """播客，效率高，语速快"""
         # 结束语音频
         ending_tts_response = client.audio.speech.create(
             model="gpt-4o-mini-tts",
