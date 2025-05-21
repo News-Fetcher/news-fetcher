@@ -16,10 +16,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger()
 client = OpenAI()
 
-# 新增标志位
-WASH_IMAGES = False           # 本次是否wash图片
-WASH_TAGS = True            # 本次是否wash tags
-WASH_TOTAL_DURATION = True  # 本次是否wash total_duration
+# ===== 新增/调整标志位 =====
+WASH_IMAGES = True             # 本次是否wash图片
+WASH_TAGS = True               # 本次是否wash tags
+WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
+DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
 
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
@@ -195,6 +196,16 @@ def main():
                     logger.info(f"播客 {cleaned_title} 的 total_duration 计算成功: {duration} 秒")
             else:
                 logger.warning(f"播客 {cleaned_title} 缺少 sha256 字段，无法构造MP3 URL。")
+
+    # 在所有数据处理完成后，再执行删除小于2分钟时长的逻辑
+    if DELETE_SHORT_AUDIO:
+        original_count = len(data["podcasts"])
+        data["podcasts"] = [
+            p for p in data["podcasts"]
+            if p.get("total_duration", 0) >= 120
+        ]
+        new_count = len(data["podcasts"])
+        logging.info(f"已删除小于2分钟时长的播客 {original_count - new_count} 个。")
 
     with open("list_to_wash_processed.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
