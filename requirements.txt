@@ -4,3 +4,4 @@ firecrawl
 pygithub
 firebase_admin
 tiktoken
+dashscope
