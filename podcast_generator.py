@@ -13,6 +13,9 @@ from openai import OpenAI
 from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_firebase_storage
 from utils.audio_utils import merge_audio_files, extract_domain, calculate_sha256
 from pydub import AudioSegment
+# 导入阿里云百炼语音合成SDK
+from dashscope.audio.tts_v2 import *
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +94,9 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
 
         logger.info(f"Summarizing article {idx + 1}: {url}")    
         # 跳过已经抓取过的文章
-        if is_url_fetched(url):
-            logger.info(f"Article {idx + 1} already fetched, skipping: {url}")
-            continue
+        # if is_url_fetched(url):
+        #     logger.info(f"Article {idx + 1} already fetched, skipping: {url}")
+        #     continue
 
         markdown_content = article.get('markdown', '')
         if not markdown_content:
@@ -122,7 +125,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
         truncated_prompt = truncate_text_to_fit_model(
             single_article_prompt,
             max_prompt_tokens=20000,   # 这里可根据需要调整
-            model_name="gpt-4o"       # 如果你用 "gpt-3.5-turbo" 或其它，请根据实际情况修改
+            model_name="qwen-plus"       # 如果你用 "gpt-3.5-turbo" 或其它，请根据实际情况修改
         )
         # =================================================================================================
 
@@ -130,7 +133,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             # ========== 新增：使用 safe_chat_completion_create，带重试 + 限制max_tokens ==========
             article_response = safe_chat_completion_create(
                 client=client,
-                model="gpt-4o",       # 你自己使用的实际模型名称
+                model="qwen-plus",       # 你自己使用的实际模型名称
                 messages=[
                     {
                         "role": "system",
@@ -157,25 +160,52 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             all_summaries.append(article_summary)
             add_url_to_fetched(url)  # 将 URL 加入已抓取列表
 
-            # 调用 TTS
+            # 调用阿里云百炼语音合成
             url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:8]
             domain = extract_domain(url)
             safe_domain = re.sub(r'[^\w.-]', '_', domain)
             filename = f"summary_{safe_domain}_{url_hash}.mp3"
             speech_file_path = Path(output_folder) / filename
-            instructions = """播客，效率高，语速快"""
-
-            tts_response = client.audio.speech.create(
-                model="gpt-4o-mini-tts",
-                voice="sage",
-                speed=1.3,
-                input=article_summary,
-                instructions=instructions,
-            )
-            tts_response.stream_to_file(speech_file_path)
-            local_mp3_files.append(speech_file_path)
-
-            logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}")
+            
+            # 使用阿里云百炼语音合成API - 使用同步方式
+            try:
+                # 限制文本长度，避免过长导致错误
+                max_text_length = 5000
+                if len(article_summary) > max_text_length:
+                    logger.warning(f"Article {idx + 1} summary too long ({len(article_summary)} chars), truncating to {max_text_length} chars")
+                    article_summary = article_summary[:max_text_length]
+                
+                # 创建语音合成器并调用 - 使用同步方式
+                tts_synthesizer = SpeechSynthesizer(
+                    model="cosyvoice-v1", 
+                    voice="longxiaochun",  # 默认使用龙小淳音色
+                    format=AudioFormat.MP3_22050HZ_MONO_256KBPS,  # 使用MP3格式，22050Hz采样率
+                    speech_rate=1.0  # 语速1.0倍，对应OpenAI的speed=1.0
+                )
+                
+                # 调用语音合成 - 同步方式
+                logger.info(f"Starting TTS for article {idx + 1} with length {len(article_summary)} chars")
+                audio_data = tts_synthesizer.call(article_summary)
+                
+                # 检查音频数据是否为空
+                if audio_data is None:
+                    logger.error(f"No audio data received for article {idx + 1}")
+                    continue
+                
+                # 将合成的音频保存到文件
+                with open(speech_file_path, 'wb') as f:
+                    f.write(audio_data)
+                
+                # 验证文件是否正确保存
+                if os.path.exists(speech_file_path) and os.path.getsize(speech_file_path) > 0:
+                    local_mp3_files.append(speech_file_path)
+                    logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}, size: {os.path.getsize(speech_file_path)} bytes")
+                else:
+                    logger.error(f"Failed to save audio for article {idx + 1} or file is empty")
+                
+            except Exception as e:
+                logger.error(f"Error in CosyVoice TTS for article {idx + 1}: {e}", exc_info=True)
+                
         except Exception as e:
             logger.error(f"Error summarizing or TTS for article {idx + 1}: {e}")
 
@@ -184,7 +214,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
 
 def generate_intro_ending(all_summaries, client, output_folder):
     """
-    调用 GPT 生成播客的开场白、标题、描述、结束语等，并生成对应 MP3 文件。
+    调用 GPT 生成播客的开场白、标题、描述、结束语等，并生成对应 MP3 文件, 注意开场白应该尽量简洁，控制在100字左右。
     返回： (mp3_files: list, title: str, description: str, tags: list, img_url: str)
     """
     mp3_files = []
@@ -211,8 +241,8 @@ def generate_intro_ending(all_summaries, client, output_folder):
         Please follow the following instructions to generate a podcast introduction:
 
         the opening:
-        Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and summarize the main topics
-        the important thing is need to be detailed, not too short
+        Combine the following article summaries into an introduction for today's news podcast. Start with a greeting and then provide a comprehensive summary of the main topics.
+        The important thing is to create a true synthesis that captures trends and significance, rather than simply listing each news item briefly. the opening should start with "欢迎收听今天的UC播客"
 
         the title:
         Provide a podcast title
@@ -239,7 +269,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
         """
 
         intro_response = client.chat.completions.create(
-            model="gpt-4o",
+            model="qwen-plus",
             messages=[
                 {"role": "system", "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"},
                 {"role": "user", "content": intro_prompt}
@@ -261,29 +291,50 @@ def generate_intro_ending(all_summaries, client, output_folder):
 
         intro_audio_path = Path(output_folder) / f"{title}_intro.mp3"
         ending_audio_path = Path(output_folder) / f"{title}_ending.mp3"
-        instructions = """播客，效率高，语速快"""
 
-        # 开场白音频
-        intro_tts_response = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice="sage",
-            speed=1.3,
-            input=opening,
-            instructions=instructions,
-        )
-        intro_tts_response.stream_to_file(intro_audio_path)
-        mp3_files.append(intro_audio_path)
-        instructions = """播客，效率高，语速快"""
-        # 结束语音频
-        ending_tts_response = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice="sage",
-            speed=1.3,
-            input=ending,
-            instructions=instructions,
-        )
-        ending_tts_response.stream_to_file(ending_audio_path)
-        mp3_files.append(ending_audio_path)
+        # 使用阿里云百炼语音合成API生成开场白音频 - 同步方式
+        try:
+            # 创建语音合成器 - 同步方式
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1", 
+                voice="longxiaochun",  # 默认使用龙小淳音色
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,  # 使用MP3格式，22050Hz采样率
+                speech_rate=1.0  # 语速1.0倍，对应OpenAI的speed=1.0
+            )
+            
+            # 合成开场白 - 同步方式
+            logger.info(f"Generating intro audio with length {len(opening)} chars")
+            intro_audio = tts_synthesizer.call(opening)
+            
+            if intro_audio is not None:
+                with open(intro_audio_path, 'wb') as f:
+                    f.write(intro_audio)
+                mp3_files.append(intro_audio_path)
+                logger.info(f"Intro audio saved: {intro_audio_path}, size: {os.path.getsize(intro_audio_path)} bytes")
+            else:
+                logger.error("No audio data received for intro")
+
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1", 
+                voice="longxiaochun",  # 默认使用龙小淳音色
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,  # 使用MP3格式，22050Hz采样率
+                speech_rate=1.0  # 语速1.0倍，对应OpenAI的speed=1.0
+            )
+            
+            # 合成结束语 - 同步方式
+            logger.info(f"Generating ending audio with length {len(ending)} chars")
+            ending_audio = tts_synthesizer.call(ending)
+            
+            if ending_audio is not None:
+                with open(ending_audio_path, 'wb') as f:
+                    f.write(ending_audio)
+                mp3_files.append(ending_audio_path)
+                logger.info(f"Ending audio saved: {ending_audio_path}, size: {os.path.getsize(ending_audio_path)} bytes")
+            else:
+                logger.error("No audio data received for ending")
+                
+        except Exception as e:
+            logger.error(f"Error in CosyVoice TTS for intro/ending: {e}", exc_info=True)
 
     except Exception as e:
         logger.error(f"Error generating intro/ending: {e}")
@@ -293,6 +344,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
         img_url = generate_and_upload_cover_image(title, description, client, output_folder)
     except Exception as e:
         logger.error(f"Error generating podcast cover image: {e}")
+        return mp3_files, title, description, tags, ""
 
     return mp3_files, title, description, tags, img_url
 
@@ -367,9 +419,12 @@ def generate_full_podcast(all_articles, output_folder):
         return
 
     # 初始化 OpenAI 客户端
-    client = OpenAI()
-
-    # 是否“简洁”
+    client = OpenAI(
+        # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
+        api_key=os.getenv("DASHSCOPE_API_KEY"), 
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    # 是否"简洁"
     be_concise = (os.getenv("BE_CONCISE") == "true")
 
     # 1. 对文章逐篇处理并生成音频
