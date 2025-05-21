@@ -19,6 +19,24 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# 根据环境变量初始化 LLM 客户端
+def initialize_llm_client():
+    """Return (client, model_name) based on SUMMARY_PROVIDER env."""
+    provider = os.getenv("SUMMARY_PROVIDER", "tongyi").lower()
+    if provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not set in environment variables.")
+        client = OpenAI(api_key=api_key)
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+    else:
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise ValueError("DASHSCOPE_API_KEY not set in environment variables.")
+        client = OpenAI(api_key=api_key, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+        model_name = os.getenv("DASHSCOPE_MODEL", "qwen-plus")
+    return client, model_name
+
 # 获取模型编码，用于计算 tokens
 def num_tokens_from_string(string: str, model_name: str = "gpt-4") -> int:
     """
@@ -85,7 +103,7 @@ def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_n
     return truncated
 
 
-def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=False):
+def summarize_and_tts_articles(news_articles, client, model_name, output_folder, be_concise=False):
     local_mp3_files = []
     all_summaries = []
 
@@ -125,7 +143,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
         truncated_prompt = truncate_text_to_fit_model(
             single_article_prompt,
             max_prompt_tokens=20000,   # 这里可根据需要调整
-            model_name="qwen-plus"       # 如果你用 "gpt-3.5-turbo" 或其它，请根据实际情况修改
+            model_name=model_name
         )
         # =================================================================================================
 
@@ -133,7 +151,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
             # ========== 新增：使用 safe_chat_completion_create，带重试 + 限制max_tokens ==========
             article_response = safe_chat_completion_create(
                 client=client,
-                model="qwen-plus",       # 你自己使用的实际模型名称
+                model=model_name,
                 messages=[
                     {
                         "role": "system",
@@ -212,7 +230,7 @@ def summarize_and_tts_articles(news_articles, client, output_folder, be_concise=
     return local_mp3_files, all_summaries
 
 
-def generate_intro_ending(all_summaries, client, output_folder):
+def generate_intro_ending(all_summaries, client, model_name, output_folder):
     """
     调用 GPT 生成播客的开场白、标题、描述、结束语等，并生成对应 MP3 文件, 注意开场白应该尽量简洁，控制在100字左右。
     返回： (mp3_files: list, title: str, description: str, tags: list, img_url: str)
@@ -269,7 +287,7 @@ def generate_intro_ending(all_summaries, client, output_folder):
         """
 
         intro_response = client.chat.completions.create(
-            model="qwen-plus",
+            model=model_name,
             messages=[
                 {"role": "system", "content": "按要求输出，仅仅给出json格式，不要输出其他内容，中文输出"},
                 {"role": "user", "content": intro_prompt}
@@ -419,20 +437,16 @@ def generate_full_podcast(all_articles, output_folder):
         logger.warning("No articles to process. Aborting podcast generation.")
         return
 
-    # 初始化 OpenAI 客户端
-    client = OpenAI(
-        # 若没有配置环境变量，请用百炼API Key将下行替换为：api_key="sk-xxx",
-        api_key=os.getenv("DASHSCOPE_API_KEY"), 
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    )
+    # 根据环境变量初始化 LLM 客户端
+    client, model_name = initialize_llm_client()
     # 是否"简洁"
     be_concise = (os.getenv("BE_CONCISE") == "true")
 
     # 1. 对文章逐篇处理并生成音频
-    articles_mp3, articles_summaries = summarize_and_tts_articles(all_articles, client, output_folder, be_concise)
+    articles_mp3, articles_summaries = summarize_and_tts_articles(all_articles, client, model_name, output_folder, be_concise)
 
     # 2. 生成节目开场 & 结束音频
-    intro_ending_mp3, title, description, tags, img_url = generate_intro_ending(articles_summaries, client, output_folder)
+    intro_ending_mp3, title, description, tags, img_url = generate_intro_ending(articles_summaries, client, model_name, output_folder)
 
     # 3. 合并全部音频
     #   将开场放最前，结束放最后
