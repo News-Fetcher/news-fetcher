@@ -21,10 +21,7 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            scrape_result = app.scrape_url(
-                url,
-                formats=['markdown', 'html']
-            )
+            scrape_result = app.scrape_url(url, params={'formats': ['markdown', 'html']})
             # 如果有 markdown，就代表成功抓取到内容
             if scrape_result and 'markdown' in scrape_result:
                 # 保持和原有逻辑类似，封装成一个 list

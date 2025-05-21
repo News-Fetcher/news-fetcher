@@ -35,10 +35,12 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
             logger.info(f"[Crawling] Website: {website}, with rules: {rules}")
             crawl_status = app.crawl_url(
                 website,
-                limit=rules.get('limit', 2),
-                scrapeOptions={'formats': ['markdown', 'html']},
-                includePaths=include_paths,
-                excludePaths=rules.get('excludePaths', []),
+                params={
+                    'limit': rules.get('limit', 2),
+                    'scrapeOptions': {'formats': ['markdown', 'html']},
+                    'includePaths': include_paths,
+                    'excludePaths': rules.get('excludePaths', []),
+                },
                 poll_interval=1
             )
 
