@@ -369,15 +369,16 @@ def extract_json_content(response_text):
 
 
 def generate_and_upload_cover_image(title, description, client, output_folder):
-    """
-    使用 OpenAI 的模型生成封面图，并上传到 Firebase Storage
-    返回封面图的公共 URL
-    """
+    """使用 OpenAI 生成播客封面图并上传到 Firebase Storage"""
+
+    # 使用独立的 OpenAI 客户端生成图片，避免受到传入 client 的 base_url 影响
+    image_client = OpenAI()  # 依赖 OPENAI_API_KEY 环境变量
+
     image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的封面..."
     logger.info(f"[Cover] Using prompt: {image_prompt}")
 
     # 调用图像生成
-    intro_response = client.images.generate(
+    intro_response = image_client.images.generate(
         model="dall-e-3",
         prompt=image_prompt,
         n=1,
