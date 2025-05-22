@@ -50,7 +50,8 @@ def num_tokens_from_string(string: str, model_name: str = "gpt-4o") -> int:
     except KeyError:
         # 如果自定义模型不被识别，就用一个通用编码器
         encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(string))
+    # 允许将特殊 token 当作普通文本处理，避免 <|endoftext|> 等触发异常
+    return len(encoding.encode(string, disallowed_special=()))
 
 def safe_chat_completion_create(
     client, model, messages, max_retries=3, initial_delay=1.0, max_tokens=2048
