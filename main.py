@@ -25,14 +25,22 @@ def main():
     fetcher_method = os.getenv("FETCHER_METHOD", "crawling")  # 默认用 crawling
     logger.info(f"FETCHER_METHOD: {fetcher_method}")
 
-    # 3. 动态生成用于抓取/爬取的日期（若需要）
-    reuters_date = datetime.now().strftime("%Y-%m-%d")
-    reuters_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    reuters_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-
-    coindesk_date = datetime.now().strftime("%Y/%m/%d")
-    coindesk_date_yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y/%m/%d")
-    coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y/%m/%d")
+    # 3. 根据配置动态生成 includePaths
+    dynamic_config_file = os.getenv("DYNAMIC_DATE_CONFIG", "news_dynamic_paths.json")
+    try:
+        dynamic_config = load_json_config(dynamic_config_file)
+        dynamic_paths = {}
+        for keyword, info in dynamic_config.items():
+            fmt = info.get("date_format", "%Y-%m-%d")
+            offsets = info.get("days_offset", [0])
+            dynamic_paths[keyword] = [
+                (datetime.now() + timedelta(days=off)).strftime(fmt)
+                for off in offsets
+            ]
+        logger.info(f"Successfully loaded {dynamic_config_file} configuration.")
+    except Exception as e:
+        logger.error(f"Failed to load {dynamic_config_file}: {e}")
+        dynamic_paths = {}
 
     # 4. 加载或解析爬取/抓取配置
     crawl_config_file = os.getenv("CRAWL_CONFIG_FILE", "news_websites_crawl_coindesk.json")
@@ -62,8 +70,7 @@ def main():
         all_articles = fetch_articles_by_scraping(news_websites_scraping)
     elif fetcher_method == "crawling":
         all_articles = fetch_articles_by_crawling(news_websites_crawl,
-                                                 [reuters_date, reuters_date_yesterday, reuters_date_tomorrow],
-                                                 [coindesk_date, coindesk_date_yesterday, coindesk_date_tomorrow])
+                                                 dynamic_paths)
     else:
         logger.warning("Unknown FETCHER_METHOD. No articles fetched.")
         all_articles = []

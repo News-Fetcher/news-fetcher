@@ -7,8 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_articles_by_crawling(news_websites_crawl: dict,
-                               reuters_date_array: list,
-                               coindesk_date_array: list):
+                               dynamic_paths: dict):
     """
     根据 crawling 配置来爬取文章。可根据日期等参数对 includePaths 做动态扩展。
     返回一个列表，内部是所有网站的所有文章。
@@ -22,14 +21,12 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
     all_articles = []
 
     for website, rules in news_websites_crawl.items():
-        include_paths = rules.get('includePaths', [])
+        include_paths = list(rules.get('includePaths', []))
 
-        # 根据特定关键字对 includePaths 做动态操作
-        if "reuters" in website:
-            include_paths.extend(reuters_date_array)
-        if "coindesk" in website:
-            include_paths.extend(coindesk_date_array)
-        # 这里也可添加别的网站的日期处理逻辑
+        # 根据配置中的关键字对 includePaths 做动态操作
+        for keyword, paths in dynamic_paths.items():
+            if keyword in website:
+                include_paths.extend(paths)
 
         try:
             logger.info(f"[Crawling] Website: {website}, with rules: {rules}")
