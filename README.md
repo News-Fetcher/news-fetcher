@@ -4,7 +4,7 @@
 
 ## 项目亮点
 - **端到端自动化**：一条命令即可完成爬取新闻、AI 摘要、语音合成、音频合并和上传。
-- **动态日期抓取**：配置支持按日期扩展 URL，适配 Reuters、CoinDesk 等需要日期参数的网站。
+- **动态日期抓取**：配置支持按日期扩展 URL，适配 Reuters、CoinDesk、news.smol.ai 等需要日期参数的网站。
 - **灵活的 LLM**：可选择 OpenAI 或阿里云百炼模型，并自动处理 token 限制和重试逻辑。
 - **自然的中文语音**：使用阿里云 cosyvoice 生成高质量中文音频，也支持自定义音色。
 - **自动封面与标签**：借助 GPT 生成开场、结束语、播客封面及关键标签，提升节目专业度。
@@ -35,8 +35,9 @@ pip install -r requirements.txt
 2. 设置环境变量：
    - `FIRECRAWL_API_KEY`：Firecrawl API Key。
    - `OPENAI_API_KEY` 或 `DASHSCOPE_API_KEY`：用于摘要和语音合成的 Key。
-   - `GH_ACCESS_TOKEN`：如果需通过 GitHub Actions 推送结果，则需要该 Token。
+ - `GH_ACCESS_TOKEN`：如果需通过 GitHub Actions 推送结果，则需要该 Token。
 3. 修改 `news_websites_crawl_*.json` 或 `news_websites_scraping.json` 以配置要抓取的网站和路径。
+4. 如需按日期扩展抓取路径，可编辑 `news_dynamic_paths.json`（或通过环境变量 `DYNAMIC_DATE_CONFIG` 指定其他文件），默认已包含 Reuters、CoinDesk、news.smol.ai 的示例。
 
 这些变量可在终端导出，也可以写入 `.env` 文件后在运行前加载。
 

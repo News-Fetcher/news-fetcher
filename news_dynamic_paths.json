@@ -1,0 +1,14 @@
+{
+  "reuters": {
+    "date_format": "%Y-%m-%d",
+    "days_offset": [0, -1, 1]
+  },
+  "coindesk": {
+    "date_format": "%Y/%m/%d",
+    "days_offset": [0, -1, 1]
+  },
+  "news.smol.ai": {
+    "date_format": "%y-%m-%d",
+    "days_offset": [0, -1, 1]
+  }
+}
