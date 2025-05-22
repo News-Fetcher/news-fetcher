@@ -72,7 +72,7 @@ def generate_img_url(title, description):
 
     # 下载图像数据
     image_data = requests.get(image_url).content
-    image_filename = f"{title.replace(' ', '_')}_cover.png"
+    image_filename = f"{uuid.uuid4().hex}.png"
     image_path = Path(output_folder) / image_filename
 
     with open(image_path, 'wb') as f:
@@ -154,7 +154,8 @@ def migrate_image_to_cos(image_url):
         logger.info(f"开始迁移图片：{image_url}")
         response = requests.get(image_url, timeout=10)
         response.raise_for_status()
-        filename = Path(image_url).name or f"{uuid.uuid4().hex}.png"
+        ext = Path(image_url).suffix or ".png"
+        filename = f"{uuid.uuid4().hex}{ext}"
         tmp_path = Path("wash_list_image") / filename
         with open(tmp_path, "wb") as f:
             f.write(response.content)
