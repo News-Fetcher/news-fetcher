@@ -6,3 +6,4 @@ firebase_admin
 tiktoken
 dashscope
 cos-python-sdk-v5
+Pillow

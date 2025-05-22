@@ -12,6 +12,7 @@ from datetime import datetime
 from openai import OpenAI
 from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_firebase_storage
 from utils.cos_utils import upload_file_to_cos
+from utils.image_utils import compress_image
 from utils.audio_utils import merge_audio_files, extract_domain, calculate_sha256
 from pydub import AudioSegment
 # 导入阿里云百炼语音合成SDK
@@ -411,13 +412,11 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
     image_url = intro_response.data[0].url
     logger.info(f"Image generated from DALL-E: {image_url}")
 
-    # 下载图像
+    # 下载并压缩图像
     image_data = requests.get(image_url).content
-    image_filename = f"{uuid.uuid4().hex}.png"
+    image_filename = f"{uuid.uuid4().hex}.jpg"
     image_path = Path(output_folder) / image_filename
-
-    with open(image_path, 'wb') as f:
-        f.write(image_data)
+    compress_image(image_data, image_path)
     logger.info(f"Cover image saved: {image_path}")
 
     # 上传到腾讯云COS
