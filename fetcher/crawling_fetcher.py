@@ -42,11 +42,20 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
                 poll_interval=1,
             )
 
-            news_articles = crawl_status.get('data', [])
+            # firecrawl-py >= 2 returns Pydantic models; convert to dict for
+            # compatibility with existing dict-based code
+            status_dict = crawl_status.model_dump()
+            news_articles = status_dict.get("data", [])
+            normalized_articles = []
             for article in news_articles:
-                logger.info(f"Article URL: {article.get('metadata', {}).get('sourceURL', '')}")
-            if news_articles:
-                all_articles.extend(news_articles)
+                if not isinstance(article, dict):
+                    article = article.model_dump()
+                logger.info(
+                    f"Article URL: {article.get('metadata', {}).get('sourceURL', '')}"
+                )
+                normalized_articles.append(article)
+            if normalized_articles:
+                all_articles.extend(normalized_articles)
             else:
                 logger.warning(f"No articles found for {website}.")
 

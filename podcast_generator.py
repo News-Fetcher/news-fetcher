@@ -108,6 +108,10 @@ def summarize_and_tts_articles(news_articles, client, model_name, output_folder,
     all_summaries = []
 
     for idx, article in enumerate(news_articles):
+        # results from firecrawl-py may be Pydantic models; convert to dict
+        if not isinstance(article, dict):
+            article = article.model_dump()
+
         url = article.get('metadata', {}).get('sourceURL', '')
 
         logger.info(f"Summarizing article {idx + 1}: {url}")    
