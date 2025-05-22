@@ -10,6 +10,7 @@ import firebase_admin
 from firebase_admin import credentials, db
 import uuid
 from utils.cos_utils import upload_file_to_cos
+from utils.image_utils import compress_image
 from mutagen.mp3 import MP3
 from io import BytesIO  # 用于处理内存中的MP3数据
 
@@ -24,6 +25,8 @@ WASH_TAGS = True               # 本次是否wash tags
 WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
 DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
 MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
+# 当图片已经在COS中时是否仍重新压缩并上传
+COMPRESS_EXISTING_IMAGES = False
 
 # 已上传至腾讯云COS的图片基准 URL 前缀
 COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.com/"
@@ -70,19 +73,18 @@ def generate_img_url(title, description):
     image_url = intro_response.data[0].url
     logger.info(f"图像生成成功：{image_url}")
 
-    # 下载图像数据
+    # 下载并压缩图像数据
     image_data = requests.get(image_url).content
-    image_filename = f"{uuid.uuid4().hex}.png"
+    image_filename = f"{uuid.uuid4().hex}.jpg"
     image_path = Path(output_folder) / image_filename
-
-    with open(image_path, 'wb') as f:
-        f.write(image_data)
-    logger.info(f"图像已下载并保存到本地：{image_path}")
+    compress_image(image_data, image_path)
+    logger.info(f"图像已下载并压缩保存到本地：{image_path}")
 
     # 上传图像到腾讯云COS
     cos_key = f"podcasts_image/{image_filename}"
     img_url = upload_file_to_cos(str(image_path), cos_key)
     logger.info(f"图像已上传到 COS：{img_url}")
+    os.remove(image_path)
 
     return img_url
 
@@ -144,21 +146,22 @@ def calculate_mp3_duration(mp3_url):
         return None
 
 
-def migrate_image_to_cos(image_url):
-    """下载并上传现有图片到COS，返回新的URL"""
-    # 如果图片已在目标 COS 域名下，无需迁移
-    if image_url.startswith(COS_IMAGE_BASE_URL):
+def migrate_image_to_cos(image_url, recompress=False):
+    """下载并上传现有图片到COS，返回新的URL
+
+    参数 recompress 为 True 时，即使图片已在 COS 也会重新压缩并上传。
+    """
+    if image_url.startswith(COS_IMAGE_BASE_URL) and not recompress:
         logger.info("图片已在腾讯云COS，无需迁移")
         return image_url
     try:
         logger.info(f"开始迁移图片：{image_url}")
         response = requests.get(image_url, timeout=10)
         response.raise_for_status()
-        ext = Path(image_url).suffix or ".png"
-        filename = f"{uuid.uuid4().hex}{ext}"
+        image_data = response.content
+        filename = f"{uuid.uuid4().hex}.jpg"
         tmp_path = Path("wash_list_image") / filename
-        with open(tmp_path, "wb") as f:
-            f.write(response.content)
+        compress_image(image_data, tmp_path)
         cos_key = f"podcasts_image/{filename}"
         new_url = upload_file_to_cos(str(tmp_path), cos_key)
         tmp_path.unlink()
@@ -201,7 +204,9 @@ def main():
 
         # 若已有img_url且需要迁移到COS
         if MIGRATE_IMAGES and podcast.get("img_url"):
-            podcast["img_url"] = migrate_image_to_cos(podcast["img_url"])
+            podcast["img_url"] = migrate_image_to_cos(
+                podcast["img_url"], recompress=COMPRESS_EXISTING_IMAGES
+            )
 
         # 若缺img_url且WASH_IMAGES为True则生成
         if WASH_IMAGES and "img_url" not in podcast:
