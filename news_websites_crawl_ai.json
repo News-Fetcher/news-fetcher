@@ -1,6 +1,6 @@
 {
   "https://news.smol.ai": {
-    "limit": 1,
+    "limit": 5,
     "includePaths": [],
     "excludePaths": [
       "wrapup",

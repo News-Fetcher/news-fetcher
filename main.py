@@ -41,6 +41,8 @@ def main():
     except Exception as e:
         logger.error(f"Failed to load {dynamic_config_file}: {e}")
         dynamic_paths = {}
+    
+    logger.info(f"dynamic_paths: {dynamic_paths}")
 
     # 4. 加载或解析爬取/抓取配置
     crawl_config_file = os.getenv("CRAWL_CONFIG_FILE", "news_websites_crawl_coindesk.json")

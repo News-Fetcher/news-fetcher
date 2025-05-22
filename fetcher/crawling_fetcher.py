@@ -21,13 +21,17 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
     all_articles = []
 
     for website, rules in news_websites_crawl.items():
+        logger.info(f"website: {website}, rules: {rules}")
         include_paths = list(rules.get('includePaths', []))
 
         # 根据配置中的关键字对 includePaths 做动态操作
         for keyword, paths in dynamic_paths.items():
+            logger.info(f"keyword: {keyword}, paths: {paths}")
             if keyword in website:
+                logger.info(f"extend paths: {paths}")
                 include_paths.extend(paths)
 
+        rules['includePaths'] = include_paths
         try:
             logger.info(f"[Crawling] Website: {website}, with rules: {rules}")
             crawl_status = app.crawl_url(

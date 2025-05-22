@@ -40,7 +40,7 @@ def initialize_llm_client():
     return client, model_name
 
 # 获取模型编码，用于计算 tokens
-def num_tokens_from_string(string: str, model_name: str = "gpt-4") -> int:
+def num_tokens_from_string(string: str, model_name: str = "gpt-4o") -> int:
     """
     计算给定文本在指定模型下的 token 数量
     注意：gpt-4o 自定义模型可能需要换成类似 gpt-3.5-turbo 或别的可识别模型名称
