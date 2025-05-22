@@ -62,11 +62,10 @@ def generate_img_url(title, description):
     # 使用指数退避重试生成图像
     intro_response = exponential_backoff_retry(
         client.images.generate,
-        model="gpt-image-1",
+        model="dall-e-3",
         prompt=image_prompt,
         n=1,
         size="1024x1024",
-        quality="standard",
         response_format="url"
     )
 
