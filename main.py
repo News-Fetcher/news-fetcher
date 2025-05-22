@@ -35,11 +35,12 @@ def main():
     coindesk_date_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y/%m/%d")
 
     # 4. 加载或解析爬取/抓取配置
+    crawl_config_file = os.getenv("CRAWL_CONFIG_FILE", "news_websites_crawl_coindesk.json")
     try:
-        news_websites_crawl = load_json_config("news_websites_crawl.json")
-        logger.info("Successfully loaded news_websites_crawl.json configuration.")
+        news_websites_crawl = load_json_config(crawl_config_file)
+        logger.info(f"Successfully loaded {crawl_config_file} configuration.")
     except Exception as e:
-        logger.error(f"Failed to load news_websites_crawl.json: {e}")
+        logger.error(f"Failed to load {crawl_config_file}: {e}")
         news_websites_crawl = {}
 
     # 5. 根据环境变量或本地文件加载 scraping 配置

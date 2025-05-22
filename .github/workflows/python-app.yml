@@ -56,7 +56,7 @@ jobs:
         run: |
           echo "$FIREBASE_KEY" > serviceAccountKey.json
 
-      - name: Run Podcast Generator
+      - name: Run Podcast Generator for Coindesk
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -64,6 +64,18 @@ jobs:
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
           BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
+          CRAWL_CONFIG_FILE: news_websites_crawl_coindesk.json
+        run: python main.py
+
+      - name: Run Podcast Generator for Reuters
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
+          FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
+          BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
+          CRAWL_CONFIG_FILE: news_websites_crawl_reuters.json
         run: python main.py
 
       - name: Send mail
