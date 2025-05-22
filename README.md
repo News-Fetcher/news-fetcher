@@ -35,8 +35,8 @@ pip install -r requirements.txt
 1. 将 Firebase 的 `serviceAccountKey.json` 放在项目根目录。
 2. 设置环境变量：
    - `FIRECRAWL_API_KEY`：Firecrawl API Key。
-   - `OPENAI_API_KEY` 或 `DASHSCOPE_API_KEY`：用于摘要和语音合成的 Key。
- - `GH_ACCESS_TOKEN`：如果需通过 GitHub Actions 推送结果，则需要该 Token。
+   - `OPENAI_API_KEY`、`DASHSCOPE_API_KEY` 或 `DEEPSEEK_API_KEY`：用于摘要和语音合成的 Key。
+   - `GH_ACCESS_TOKEN`：如果需通过 GitHub Actions 推送结果，则需要该 Token。
 3. 修改 `news_websites_crawl_*.json` 或 `news_websites_scraping.json` 以配置要抓取的网站和路径。
 4. 如需按日期扩展抓取路径，可编辑 `news_dynamic_paths.json`（或通过环境变量 `DYNAMIC_DATE_CONFIG` 指定其他文件），默认已包含 Reuters、CoinDesk、news.smol.ai 的示例。
 
@@ -59,7 +59,9 @@ pip install -r requirements.txt
 - `OPENAI_MODEL`：OpenAI 模型名称，默认 `gpt-4o`。
 - `DASHSCOPE_API_KEY`：阿里云百炼 API Key，`SUMMARY_PROVIDER=tongyi` 时使用。
 - `DASHSCOPE_MODEL`：阿里云模型名称，默认 `qwen-plus`。
-- `SUMMARY_PROVIDER`：选择 `openai` 或 `tongyi` 作为摘要和文生图的提供方，默认 `tongyi`。
+- `DEEPSEEK_API_KEY`：DeepSeek API Key，`SUMMARY_PROVIDER=deepseek` 时使用。
+- `DEEPSEEK_MODEL`：DeepSeek 模型名称，默认 `deepseek-chat`。
+- `SUMMARY_PROVIDER`：选择 `openai`、`tongyi` 或 `deepseek` 作为摘要和文生图的提供方，默认 `tongyi`。
 - `BE_CONCISE`：设为 `true` 时生成更简洁的摘要。
 - `FETCHER_METHOD`：`crawling`（默认）或 `scraping`，决定新闻获取方式。
 - `CRAWL_CONFIG_FILE`：爬取配置文件路径，默认为 `news_websites_crawl_coindesk.json`。

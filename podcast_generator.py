@@ -31,6 +31,12 @@ def initialize_llm_client():
             raise ValueError("OPENAI_API_KEY not set in environment variables.")
         client = OpenAI(api_key=api_key)
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+    elif provider == "deepseek":
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise ValueError("DEEPSEEK_API_KEY not set in environment variables.")
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        model_name = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     else:
         api_key = os.getenv("DASHSCOPE_API_KEY")
         if not api_key:
