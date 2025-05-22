@@ -25,6 +25,9 @@ WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
 DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
 MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
 
+# 已上传至腾讯云COS的图片基准 URL 前缀
+COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.com/"
+
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
 
@@ -143,6 +146,10 @@ def calculate_mp3_duration(mp3_url):
 
 def migrate_image_to_cos(image_url):
     """下载并上传现有图片到COS，返回新的URL"""
+    # 如果图片已在目标 COS 域名下，无需迁移
+    if image_url.startswith(COS_IMAGE_BASE_URL):
+        logger.info("图片已在腾讯云COS，无需迁移")
+        return image_url
     try:
         logger.info(f"开始迁移图片：{image_url}")
         response = requests.get(image_url, timeout=10)
