@@ -62,6 +62,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_PATH: ${{ secrets.COS_PATH }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
           BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
@@ -74,6 +79,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_PATH: ${{ secrets.COS_PATH }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
           BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
