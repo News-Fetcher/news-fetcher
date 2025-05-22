@@ -85,7 +85,7 @@ def safe_chat_completion_create(
     raise RuntimeError("Max retries exceeded for chat.completions.create()")
 
 
-def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_name: str = "gpt-4"):
+def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_name: str = "gpt-4o"):
     """
     简单截断方式：确保 prompt 的 token 总数不超过 max_prompt_tokens
     若超过则直接把末尾砍掉。
