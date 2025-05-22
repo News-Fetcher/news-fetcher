@@ -429,6 +429,59 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
     return final_img_url
 
 
+def generate_news_analysis(all_summaries, client, model_name, output_folder):
+    """基于所有新闻摘要生成整体分析并输出 MP3"""
+
+    if not all_summaries:
+        logger.warning("No summaries provided for analysis")
+        return None, ""
+
+    analysis_prompt = f"""
+    请根据以下新闻摘要，给出对今日新闻的整体分析，指出主要趋势及可能的影响，控制在300字以内：
+    {chr(10).join(all_summaries)}
+    """
+
+    try:
+        analysis_response = safe_chat_completion_create(
+            client=client,
+            model=model_name,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一位资深新闻评论员，擅长提炼深度分析并提供独到见解。"
+                },
+                {"role": "user", "content": analysis_prompt}
+            ],
+            max_tokens=1024
+        )
+        analysis_text = analysis_response.choices[0].message.content.strip()
+        logger.info(f"Daily analysis generated:\n{analysis_text}")
+
+        analysis_audio_path = Path(output_folder) / "daily_analysis.mp3"
+        try:
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1",
+                voice="longxiaochun",
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,
+                speech_rate=1.0,
+            )
+
+            audio_data = tts_synthesizer.call(analysis_text)
+            if audio_data is not None:
+                with open(analysis_audio_path, "wb") as f:
+                    f.write(audio_data)
+                logger.info(f"Analysis audio saved: {analysis_audio_path}")
+                return analysis_audio_path, analysis_text
+        except Exception as e:
+            logger.error(f"Error generating analysis audio: {e}")
+            return None, analysis_text
+
+    except Exception as e:
+        logger.error(f"Error generating daily analysis: {e}")
+        return None, ""
+
+
+
 def generate_full_podcast(all_articles, output_folder):
     """
     处理所有文章 => 生成音频 => 生成开场&结束 => 合并音频 => 上传到 Firebase
@@ -445,18 +498,24 @@ def generate_full_podcast(all_articles, output_folder):
     # 1. 对文章逐篇处理并生成音频
     articles_mp3, articles_summaries = summarize_and_tts_articles(all_articles, client, model_name, output_folder, be_concise)
 
-    # 2. 生成节目开场 & 结束音频
+    # 2. 生成AI新闻分析音频
+    analysis_mp3, analysis_text = generate_news_analysis(articles_summaries, client, model_name, output_folder)
+
+    # 3. 生成节目开场 & 结束音频
     intro_ending_mp3, title, description, tags, img_url = generate_intro_ending(articles_summaries, client, model_name, output_folder)
 
-    # 3. 合并全部音频
-    #   将开场放最前，结束放最后
-    mp3_to_merge = [intro_ending_mp3[0]] + articles_mp3 + [intro_ending_mp3[1]]
+    # 4. 合并全部音频
+    #   将开场放最前，分析放最后但在结束语之前
+    mp3_to_merge = [intro_ending_mp3[0]] + articles_mp3
+    if analysis_mp3:
+        mp3_to_merge.append(analysis_mp3)
+    mp3_to_merge.append(intro_ending_mp3[1])
     today_date = datetime.now().strftime("%Y-%m-%d")
     final_podcast_filename = f"{today_date}_{title}.mp3"
     final_podcast_path = Path(output_folder) / final_podcast_filename
     merge_audio_files(mp3_to_merge, final_podcast_path)
 
-    # 4. 上传到 Firebase Storage
+    # 5. 上传到 Firebase Storage
     sha256_hash = calculate_sha256(str(final_podcast_path))
     from utils.firebase_utils import upload_to_firebase_storage
     audio_public_url, file_sha256 = upload_to_firebase_storage(
