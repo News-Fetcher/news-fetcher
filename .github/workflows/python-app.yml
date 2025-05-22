@@ -23,6 +23,11 @@ on:
         required: false
         default: true
         type: boolean
+      summary_provider:
+        description: 'Which provider to use for summarization'
+        required: false
+        default: 'openai'
+        type: string
 
   schedule:
     - cron: "0 1 * * *" 
@@ -62,6 +67,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          SUMMARY_PROVIDER: ${{ github.event.inputs.summary_provider || 'openai' }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
           BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
@@ -74,6 +80,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          SUMMARY_PROVIDER: ${{ github.event.inputs.summary_provider || 'openai' }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
           BE_CONCISE: ${{ github.event.inputs.be_concise || 'true' }}
