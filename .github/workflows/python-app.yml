@@ -60,6 +60,7 @@ jobs:
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
@@ -71,6 +72,7 @@ jobs:
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
           GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           SCRAPING_CONFIG: ${{ github.event.inputs.scraping_config || '{}' }}
           FETCHER_METHOD: ${{ github.event.inputs.method || 'crawling' }}
