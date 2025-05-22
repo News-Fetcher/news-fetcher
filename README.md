@@ -44,6 +44,7 @@ This script automates the process of crawling news websites, summarizing article
 	•	FIRECRAWL_API_KEY: Your Firecrawl API key.
 
 	•	GH_ACCESS_TOKEN: Your GitHub access token.
+	•	DASHSCOPE_API_KEY: Your DashScope API key.
 
 2.	Update the script:
 
