@@ -25,7 +25,7 @@ WASH_TAGS = True               # 本次是否wash tags
 WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
 DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
 MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
-COMPRESS_EXISTING_IMAGES = True # 当图片已经在COS中时是否仍重新压缩并上传
+COMPRESS_EXISTING_IMAGES = False # 当图片已经在COS中时是否仍重新压缩并上传
 
 # 已上传至腾讯云COS的图片基准 URL 前缀
 COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.com/"

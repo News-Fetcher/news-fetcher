@@ -1,0 +1,10 @@
+{
+  "https://news.smol.ai": {
+    "limit": 1,
+    "includePaths": [],
+    "excludePaths": [
+      "wrapup",
+      "podcasts"
+    ]
+  }
+}
