@@ -403,14 +403,15 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
 
     # 调用图像生成
     intro_response = image_client.images.generate(
-        model="dall-e-3",
+        model="gpt-image-1",
         prompt=image_prompt,
         n=1,
         size="1024x1024",
+        quality="standard",
         response_format="url"
     )
     image_url = intro_response.data[0].url
-    logger.info(f"Image generated from DALL-E: {image_url}")
+    logger.info(f"Image generated from gpt-image-1: {image_url}")
 
     # 下载并压缩图像
     image_data = requests.get(image_url).content
