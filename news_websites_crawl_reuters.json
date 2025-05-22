@@ -1,0 +1,10 @@
+{
+  "https://www.reuters.com": {
+    "limit": 10,
+    "includePaths": [],
+    "excludePaths": [
+      "wrapup",
+      "podcasts"
+    ]
+  }
+}
