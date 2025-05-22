@@ -413,7 +413,7 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
 
     # 下载图像
     image_data = requests.get(image_url).content
-    image_filename = f"{title.replace(' ', '_')}_{uuid.uuid4().hex}_cover.png"
+    image_filename = f"{uuid.uuid4().hex}.png"
     image_path = Path(output_folder) / image_filename
 
     with open(image_path, 'wb') as f:
