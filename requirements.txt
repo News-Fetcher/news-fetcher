@@ -5,3 +5,4 @@ pygithub
 firebase_admin
 tiktoken
 dashscope
+cos-python-sdk-v5

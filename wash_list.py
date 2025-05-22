@@ -7,7 +7,9 @@ from pathlib import Path
 import requests
 import time
 import firebase_admin
-from firebase_admin import credentials, db, storage
+from firebase_admin import credentials, db
+import uuid
+from utils.cos_utils import upload_file_to_cos
 from mutagen.mp3 import MP3
 from io import BytesIO  # 用于处理内存中的MP3数据
 
@@ -21,6 +23,7 @@ WASH_IMAGES = True             # 本次是否wash图片
 WASH_TAGS = True               # 本次是否wash tags
 WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
 DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
+MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
 
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
@@ -73,17 +76,10 @@ def generate_img_url(title, description):
         f.write(image_data)
     logger.info(f"图像已下载并保存到本地：{image_path}")
 
-    # 上传图像到 Firebase Storage
-    bucket = storage.bucket()
-    firebase_image_path = f"podcasts_image/{image_filename}"
-    blob = bucket.blob(firebase_image_path)
-    blob.upload_from_filename(image_path)
-    logger.info(f"图像已上传到 Firebase Storage：{firebase_image_path}")
-
-    # 获取公共URL
-    blob.make_public()
-    img_url = blob.public_url
-    logger.info(f"图像的公共 URL：{img_url}")
+    # 上传图像到腾讯云COS
+    cos_key = f"podcasts_image/{image_filename}"
+    img_url = upload_file_to_cos(str(image_path), cos_key)
+    logger.info(f"图像已上传到 COS：{img_url}")
 
     return img_url
 
@@ -144,6 +140,26 @@ def calculate_mp3_duration(mp3_url):
         logger.error(f"无法计算MP3文件 {mp3_url} 的时长，错误：{e}")
         return None
 
+
+def migrate_image_to_cos(image_url):
+    """下载并上传现有图片到COS，返回新的URL"""
+    try:
+        logger.info(f"开始迁移图片：{image_url}")
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        filename = Path(image_url).name or f"{uuid.uuid4().hex}.png"
+        tmp_path = Path("wash_list_image") / filename
+        with open(tmp_path, "wb") as f:
+            f.write(response.content)
+        cos_key = f"podcasts_image/{filename}"
+        new_url = upload_file_to_cos(str(tmp_path), cos_key)
+        tmp_path.unlink()
+        logger.info(f"图片迁移完成：{new_url}")
+        return new_url
+    except Exception as e:
+        logger.error(f"迁移图片失败 {image_url}：{e}")
+        return image_url
+
 def main():
     logging.info("开始处理播客列表...")
 
@@ -174,6 +190,10 @@ def main():
         cleaned_title = re.sub(r"\.mp3$", "", cleaned_title)
         podcast["title"] = cleaned_title
         logging.info(f"清理后的标题: {cleaned_title}")
+
+        # 若已有img_url且需要迁移到COS
+        if MIGRATE_IMAGES and podcast.get("img_url"):
+            podcast["img_url"] = migrate_image_to_cos(podcast["img_url"])
 
         # 若缺img_url且WASH_IMAGES为True则生成
         if WASH_IMAGES and "img_url" not in podcast:

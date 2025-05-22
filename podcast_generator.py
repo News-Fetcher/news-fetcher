@@ -11,6 +11,7 @@ import tiktoken
 from datetime import datetime
 from openai import OpenAI
 from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_firebase_storage
+from utils.cos_utils import upload_file_to_cos
 from utils.audio_utils import merge_audio_files, extract_domain, calculate_sha256
 from pydub import AudioSegment
 # 导入阿里云百炼语音合成SDK
@@ -387,7 +388,7 @@ def extract_json_content(response_text):
 
 
 def generate_and_upload_cover_image(title, description, client, output_folder):
-    """使用 OpenAI 生成播客封面图并上传到 Firebase Storage"""
+    """使用 OpenAI 生成播客封面图并上传到腾讯云COS"""
 
     # 使用独立的 OpenAI 客户端生成图片，避免受到传入 client 的 base_url 影响
     image_client = OpenAI()  # 依赖 OPENAI_API_KEY 环境变量
@@ -415,16 +416,10 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
         f.write(image_data)
     logger.info(f"Cover image saved: {image_path}")
 
-    # 上传到 Firebase
-    from firebase_admin import storage
-    bucket = storage.bucket()
-    firebase_image_path = f"podcasts_image/{image_filename}"
-    blob = bucket.blob(firebase_image_path)
-    blob.upload_from_filename(image_path)
-    blob.make_public()
-    final_img_url = blob.public_url
-
-    logger.info(f"Cover image uploaded to {firebase_image_path}, public URL: {final_img_url}")
+    # 上传到腾讯云COS
+    cos_key = f"podcasts_image/{image_filename}"
+    final_img_url = upload_file_to_cos(str(image_path), cos_key)
+    logger.info(f"Cover image uploaded to COS {cos_key}, public URL: {final_img_url}")
     os.remove(image_path)  # 可选：删除本地文件
     return final_img_url
 
