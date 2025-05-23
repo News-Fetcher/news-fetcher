@@ -93,5 +93,5 @@ podcast_audio/2024-11-28_Daily_News.mp3
 - 配置文件中的 `limit` 和 `includePaths` 可控制抓取范围和数量。
 
 ## License
-本项目采用 MIT License，详见 LICENSE 文件。
+本项目采用 MIT License，同时声明支持 GPL 协议（GNU General Public License），详见 LICENSE 文件。
 
