@@ -34,12 +34,27 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
         rules['includePaths'] = include_paths
         try:
             logger.info(f"[Crawling] Website: {website}, with rules: {rules}")
+            scrape_options = ScrapeOptions(formats=["markdown", "html"])
+            # Avoid serialization errors by converting ScrapeOptions to a plain
+            # dictionary before passing it to the Firecrawl client.
+            if hasattr(scrape_options, "model_dump"):
+                scrape_options = scrape_options.model_dump()
+            else:
+                try:
+                    from dataclasses import asdict, is_dataclass
+                    if is_dataclass(scrape_options):
+                        scrape_options = asdict(scrape_options)
+                    else:
+                        scrape_options = scrape_options.__dict__
+                except Exception:  # pragma: no cover - defensive fallback
+                    scrape_options = scrape_options.__dict__
+
             crawl_status = app.crawl_url(
                 website,
                 limit=rules.get('limit', 2),
                 include_paths=include_paths,
                 exclude_paths=rules.get('excludePaths', []),
-                scrape_options=ScrapeOptions(formats=["markdown", "html"]),
+                scrape_options=scrape_options,
                 poll_interval=1,
             )
 
