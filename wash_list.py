@@ -33,6 +33,11 @@ COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
 
+# ----- image generation defaults -----
+IMAGE_MODEL = "gpt-image-1"
+IMAGE_SIZE = "1024x1024"
+IMAGE_QUALITY = "standard"
+
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
     """
     通用指数退避重试函数:
@@ -62,11 +67,11 @@ def generate_img_url(title, description):
     # 使用指数退避重试生成图像
     intro_response = exponential_backoff_retry(
         client.images.generate,
-        model="gpt-image-1",
+        model=IMAGE_MODEL,
         prompt=image_prompt,
         n=1,
-        size="1024x1024",
-        quality="standard",
+        size=IMAGE_SIZE,
+        quality=IMAGE_QUALITY,
         response_format="url"
     )
 
