@@ -14,12 +14,27 @@ from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_f
 from utils.cos_utils import upload_file_to_cos
 from utils.image_utils import compress_image
 from utils.audio_utils import merge_audio_files, extract_domain, calculate_sha256
+from utils.common_utils import load_json_config
 from pydub import AudioSegment
 # 导入阿里云百炼语音合成SDK
 from dashscope.audio.tts_v2 import *
 import time
 
 logger = logging.getLogger(__name__)
+
+# Load image generation config
+IMAGE_CONFIG_FILE = os.getenv("IMAGE_GEN_CONFIG_FILE", "image_generation_config.json")
+try:
+    image_cfg = load_json_config(IMAGE_CONFIG_FILE)
+    IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
+    IMAGE_SIZE = image_cfg.get("size", "1024x1024")
+    IMAGE_QUALITY = image_cfg.get("quality", "standard")
+    logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
+except Exception as e:
+    logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
+    IMAGE_MODEL = "gpt-image-1"
+    IMAGE_SIZE = "1024x1024"
+    IMAGE_QUALITY = "standard"
 
 # 根据环境变量初始化 LLM 客户端
 def initialize_llm_client():
@@ -31,6 +46,12 @@ def initialize_llm_client():
             raise ValueError("OPENAI_API_KEY not set in environment variables.")
         client = OpenAI(api_key=api_key)
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+    elif provider == "deepseek":
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            raise ValueError("DEEPSEEK_API_KEY not set in environment variables.")
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        model_name = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     else:
         api_key = os.getenv("DASHSCOPE_API_KEY")
         if not api_key:
@@ -404,14 +425,15 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
 
     # 调用图像生成
     intro_response = image_client.images.generate(
-        model="dall-e-3",
+        model=IMAGE_MODEL,
         prompt=image_prompt,
         n=1,
-        size="1024x1024",
+        size=IMAGE_SIZE,
+        quality=IMAGE_QUALITY,
         response_format="url"
     )
     image_url = intro_response.data[0].url
-    logger.info(f"Image generated from DALL-E: {image_url}")
+    logger.info(f"Image generated from {IMAGE_MODEL}: {image_url}")
 
     # 下载并压缩图像
     image_data = requests.get(image_url).content
@@ -426,6 +448,59 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
     logger.info(f"Cover image uploaded to COS {cos_key}, public URL: {final_img_url}")
     os.remove(image_path)  # 可选：删除本地文件
     return final_img_url
+
+
+def generate_news_analysis(all_summaries, client, model_name, output_folder):
+    """基于所有新闻摘要生成整体分析并输出 MP3"""
+
+    if not all_summaries:
+        logger.warning("No summaries provided for analysis")
+        return None, ""
+
+    analysis_prompt = f"""
+    请根据以下新闻摘要，给出对今日新闻的整体分析，指出主要趋势及可能的影响，控制在300字以内：
+    {chr(10).join(all_summaries)}
+    """
+
+    try:
+        analysis_response = safe_chat_completion_create(
+            client=client,
+            model=model_name,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一位资深新闻评论员，擅长提炼深度分析并提供独到见解。"
+                },
+                {"role": "user", "content": analysis_prompt}
+            ],
+            max_tokens=1024
+        )
+        analysis_text = analysis_response.choices[0].message.content.strip()
+        logger.info(f"Daily analysis generated:\n{analysis_text}")
+
+        analysis_audio_path = Path(output_folder) / "daily_analysis.mp3"
+        try:
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1",
+                voice="longxiaochun",
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,
+                speech_rate=1.0,
+            )
+
+            audio_data = tts_synthesizer.call(analysis_text)
+            if audio_data is not None:
+                with open(analysis_audio_path, "wb") as f:
+                    f.write(audio_data)
+                logger.info(f"Analysis audio saved: {analysis_audio_path}")
+                return analysis_audio_path, analysis_text
+        except Exception as e:
+            logger.error(f"Error generating analysis audio: {e}")
+            return None, analysis_text
+
+    except Exception as e:
+        logger.error(f"Error generating daily analysis: {e}")
+        return None, ""
+
 
 
 def generate_full_podcast(all_articles, output_folder):
@@ -444,18 +519,24 @@ def generate_full_podcast(all_articles, output_folder):
     # 1. 对文章逐篇处理并生成音频
     articles_mp3, articles_summaries = summarize_and_tts_articles(all_articles, client, model_name, output_folder, be_concise)
 
-    # 2. 生成节目开场 & 结束音频
+    # 2. 生成AI新闻分析音频
+    analysis_mp3, analysis_text = generate_news_analysis(articles_summaries, client, model_name, output_folder)
+
+    # 3. 生成节目开场 & 结束音频
     intro_ending_mp3, title, description, tags, img_url = generate_intro_ending(articles_summaries, client, model_name, output_folder)
 
-    # 3. 合并全部音频
-    #   将开场放最前，结束放最后
-    mp3_to_merge = [intro_ending_mp3[0]] + articles_mp3 + [intro_ending_mp3[1]]
+    # 4. 合并全部音频
+    #   将开场放最前，分析放最后但在结束语之前
+    mp3_to_merge = [intro_ending_mp3[0]] + articles_mp3
+    if analysis_mp3:
+        mp3_to_merge.append(analysis_mp3)
+    mp3_to_merge.append(intro_ending_mp3[1])
     today_date = datetime.now().strftime("%Y-%m-%d")
     final_podcast_filename = f"{today_date}_{title}.mp3"
     final_podcast_path = Path(output_folder) / final_podcast_filename
     merge_audio_files(mp3_to_merge, final_podcast_path)
 
-    # 4. 上传到 Firebase Storage
+    # 5. 上传到 Firebase Storage
     sha256_hash = calculate_sha256(str(final_podcast_path))
     from utils.firebase_utils import upload_to_firebase_storage
     audio_public_url, file_sha256 = upload_to_firebase_storage(
