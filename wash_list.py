@@ -81,8 +81,7 @@ def generate_img_url(title, description):
         prompt=image_prompt,
         n=1,
         size=IMAGE_SIZE,
-        quality=IMAGE_QUALITY,
-        response_format="url"
+        quality=IMAGE_QUALITY
     )
 
     image_url = intro_response.data[0].url

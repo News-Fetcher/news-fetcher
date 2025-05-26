@@ -429,8 +429,7 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
         prompt=image_prompt,
         n=1,
         size=IMAGE_SIZE,
-        quality=IMAGE_QUALITY,
-        response_format="url"
+        quality=IMAGE_QUALITY
     )
     image_url = intro_response.data[0].url
     logger.info(f"Image generated from {IMAGE_MODEL}: {image_url}")
