@@ -28,13 +28,13 @@ try:
     image_cfg = load_json_config(IMAGE_CONFIG_FILE)
     IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
     IMAGE_SIZE = image_cfg.get("size", "1024x1024")
-    IMAGE_QUALITY = image_cfg.get("quality", "standard")
+    IMAGE_QUALITY = image_cfg.get("quality", "medium")
     logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
 except Exception as e:
     logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
     IMAGE_MODEL = "gpt-image-1"
     IMAGE_SIZE = "1024x1024"
-    IMAGE_QUALITY = "standard"
+    IMAGE_QUALITY = "medium"
 
 # 根据环境变量初始化 LLM 客户端
 def initialize_llm_client():

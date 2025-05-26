@@ -21,12 +21,12 @@ logger = logging.getLogger()
 client = OpenAI()
 
 # ===== 新增/调整标志位 =====
-WASH_IMAGES = True             # 本次是否wash图片
+WASH_IMAGES = False             # 本次是否wash图片
 WASH_TAGS = True               # 本次是否wash tags
 WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
 DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
 MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
-COMPRESS_EXISTING_IMAGES = False # 当图片已经在COS中时是否仍重新压缩并上传
+COMPRESS_EXISTING_IMAGES = True # 当图片已经在COS中时是否仍重新压缩并上传
 
 # 已上传至腾讯云COS的图片基准 URL 前缀
 COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.com/"
@@ -40,13 +40,13 @@ try:
     image_cfg = load_json_config(IMAGE_CONFIG_FILE)
     IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
     IMAGE_SIZE = image_cfg.get("size", "1024x1024")
-    IMAGE_QUALITY = image_cfg.get("quality", "standard")
+    IMAGE_QUALITY = image_cfg.get("quality", "medium")
     logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
 except Exception as e:
     logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
     IMAGE_MODEL = "gpt-image-1"
     IMAGE_SIZE = "1024x1024"
-    IMAGE_QUALITY = "standard"
+    IMAGE_QUALITY = "medium"
 
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
     """
