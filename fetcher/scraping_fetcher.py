@@ -21,10 +21,11 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            scrape_result = app.scrape_url(
-                url,
-                scrape_options=ScrapeOptions(formats=["markdown", "html"]),
-            )
+            # firecrawl-py >= 2 removed the scrape_options parameter from
+            # `scrape_url`. To continue reusing ``ScrapeOptions`` we convert the
+            # Pydantic model to a dict and pass it as kwargs.
+            options = ScrapeOptions(formats=["markdown", "html"]).model_dump()
+            scrape_result = app.scrape_url(url, **options)
 
             # firecrawl-py >= 2 returns a model; convert to dict so existing
             # code using dict access continues to work
