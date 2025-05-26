@@ -21,23 +21,13 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            # firecrawl-py >= 2 removed the scrape_options parameter from
-            # `scrape_url`. To continue reusing ``ScrapeOptions`` we convert the
-            # Pydantic model to a dict and pass it as kwargs.
-            options = ScrapeOptions(formats=["markdown", "html"]).model_dump()
-            scrape_result = app.scrape_url(url, **options)
-
-            # firecrawl-py >= 2 returns a model; convert to dict so existing
-            # code using dict access continues to work
-            if scrape_result:
-                if not isinstance(scrape_result, dict):
-                    scrape_result = scrape_result.model_dump()
-
-                # 如果有 markdown，就代表成功抓取到内容
-                if "markdown" in scrape_result:
-                    # 保持和原有逻辑类似，封装成一个 list
-                    news_articles = [scrape_result]
-                    all_articles.extend(news_articles)
+            scrape_result = app.scrape_url(url, formats=["markdown", "html"])
+    
+            if scrape_result and not isinstance(scrape_result, dict):
+                scrape_result = scrape_result.model_dump()
+    
+            if "markdown" in scrape_result:
+                all_articles.append(scrape_result)
         except Exception as e:
             logger.error(f"Error scraping {url}: {e}")
 
