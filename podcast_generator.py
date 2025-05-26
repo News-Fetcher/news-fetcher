@@ -14,6 +14,7 @@ from utils.firebase_utils import is_url_fetched, add_url_to_fetched, upload_to_f
 from utils.cos_utils import upload_file_to_cos
 from utils.image_utils import compress_image
 from utils.audio_utils import merge_audio_files, extract_domain, calculate_sha256
+from utils.common_utils import load_json_config
 from pydub import AudioSegment
 # 导入阿里云百炼语音合成SDK
 from dashscope.audio.tts_v2 import *
@@ -21,10 +22,19 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Default settings for GPT image generation
-IMAGE_MODEL = "gpt-image-1"
-IMAGE_SIZE = "1024x1024"
-IMAGE_QUALITY = "standard"
+# Load image generation config
+IMAGE_CONFIG_FILE = os.getenv("IMAGE_GEN_CONFIG_FILE", "image_generation_config.json")
+try:
+    image_cfg = load_json_config(IMAGE_CONFIG_FILE)
+    IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
+    IMAGE_SIZE = image_cfg.get("size", "1024x1024")
+    IMAGE_QUALITY = image_cfg.get("quality", "standard")
+    logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
+except Exception as e:
+    logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
+    IMAGE_MODEL = "gpt-image-1"
+    IMAGE_SIZE = "1024x1024"
+    IMAGE_QUALITY = "standard"
 
 # 根据环境变量初始化 LLM 客户端
 def initialize_llm_client():

@@ -51,13 +51,14 @@ pip install -r requirements.txt
 - **news_websites_scraping.json**：直接抓取的文章 URL 列表，用于无需站点爬取时的场景。
 - **news_dynamic_paths.json**：根据站点关键字提供日期格式和 `days_offset`，在运行时自动生成 `includePaths`。
 - **serviceAccountKey.json**：Firebase 凭证文件，需放在项目根目录。
+- **image_generation_config.json**：配置播客封面图片生成的模型、尺寸和质量。
 
 ### 环境变量说明
 
 - `FIRECRAWL_API_KEY`：Firecrawl API Key，用于爬取或抓取文章。
 - `OPENAI_API_KEY`：当 `SUMMARY_PROVIDER=openai` 时使用的 API Key。
 - `OPENAI_MODEL`：OpenAI 模型名称，默认 `gpt-4o`。
-- 播客封面图片通过 `gpt-image-1` 生成，分辨率 `1024x1024`、质量 `standard`（约 0.04 USD）。
+- 图片生成配置可在 `image_generation_config.json` 中调整，包括模型、尺寸和质量。
 - `DASHSCOPE_API_KEY`：阿里云百炼 API Key，`SUMMARY_PROVIDER=tongyi` 时使用。
 - `DASHSCOPE_MODEL`：阿里云模型名称，默认 `qwen-plus`。
 - `DEEPSEEK_API_KEY`：DeepSeek API Key，`SUMMARY_PROVIDER=deepseek` 时使用。
@@ -69,6 +70,7 @@ pip install -r requirements.txt
 - `SCRAPING_CONFIG`：直接传入的抓取配置 JSON 字符串，优先级高于本地文件。
 - `DYNAMIC_DATE_CONFIG`：动态日期配置文件路径，默认为 `news_dynamic_paths.json`。
 - `GH_ACCESS_TOKEN`：如需通过 GitHub Actions 推送结果时使用。
+- `IMAGE_GEN_CONFIG_FILE`：图片生成配置文件路径，默认为 `image_generation_config.json`。
 - `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_REGION`、`COS_BUCKET`、`COS_PATH`：配置腾讯云 COS 上传所需的凭据及路径。
 
 ## 使用方法
