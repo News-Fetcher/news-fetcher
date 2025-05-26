@@ -21,26 +21,9 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            scrape_options = ScrapeOptions(formats=["markdown", "html"])
-            # firecrawl-py may not handle custom objects when serializing the
-            # request payload. Convert ScrapeOptions to a plain dict first to
-            # avoid "Object of type ScrapeOptions is not JSON serializable"
-            # errors.
-            if hasattr(scrape_options, "model_dump"):
-                scrape_options = scrape_options.model_dump()
-            else:
-                try:
-                    from dataclasses import asdict, is_dataclass
-                    if is_dataclass(scrape_options):
-                        scrape_options = asdict(scrape_options)
-                    else:
-                        scrape_options = scrape_options.__dict__
-                except Exception:  # pragma: no cover - fallback for unexpected cases
-                    scrape_options = scrape_options.__dict__
-
             scrape_result = app.scrape_url(
                 url,
-                scrape_options=scrape_options,
+                scrape_options=ScrapeOptions(formats=["markdown", "html"]),
             )
 
             # firecrawl-py >= 2 returns a model; convert to dict so existing
