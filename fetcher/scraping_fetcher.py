@@ -1,7 +1,7 @@
 # fetcher/scraping_fetcher.py
 import logging
 import os
-from firecrawl import FirecrawlApp
+from firecrawl import FirecrawlApp, ScrapeOptions
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
             logger.info(f"[Scraping] Fetching URL: {url}")
             scrape_result = app.scrape_url(
                 url,
-                params={"formats": ["markdown", "html"]},
+                scrape_options=ScrapeOptions(formats=["markdown", "html"]),
             )
 
             # firecrawl-py >= 2 returns a model; convert to dict so existing
