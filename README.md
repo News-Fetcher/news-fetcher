@@ -57,6 +57,7 @@ pip install -r requirements.txt
 - `FIRECRAWL_API_KEY`：Firecrawl API Key，用于爬取或抓取文章。
 - `OPENAI_API_KEY`：当 `SUMMARY_PROVIDER=openai` 时使用的 API Key。
 - `OPENAI_MODEL`：OpenAI 模型名称，默认 `gpt-4o`。
+- 播客封面图片通过 `gpt-image-1` 生成，分辨率 `1024x1024`、质量 `standard`（约 0.04 USD）。
 - `DASHSCOPE_API_KEY`：阿里云百炼 API Key，`SUMMARY_PROVIDER=tongyi` 时使用。
 - `DASHSCOPE_MODEL`：阿里云模型名称，默认 `qwen-plus`。
 - `DEEPSEEK_API_KEY`：DeepSeek API Key，`SUMMARY_PROVIDER=deepseek` 时使用。

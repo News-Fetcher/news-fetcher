@@ -21,6 +21,11 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# Default settings for GPT image generation
+IMAGE_MODEL = "gpt-image-1"
+IMAGE_SIZE = "1024x1024"
+IMAGE_QUALITY = "standard"
+
 # 根据环境变量初始化 LLM 客户端
 def initialize_llm_client():
     """Return (client, model_name) based on SUMMARY_PROVIDER env."""
@@ -410,15 +415,15 @@ def generate_and_upload_cover_image(title, description, client, output_folder):
 
     # 调用图像生成
     intro_response = image_client.images.generate(
-        model="gpt-image-1",
+        model=IMAGE_MODEL,
         prompt=image_prompt,
         n=1,
-        size="1024x1024",
-        quality="standard",
+        size=IMAGE_SIZE,
+        quality=IMAGE_QUALITY,
         response_format="url"
     )
     image_url = intro_response.data[0].url
-    logger.info(f"Image generated from gpt-image-1: {image_url}")
+    logger.info(f"Image generated from {IMAGE_MODEL}: {image_url}")
 
     # 下载并压缩图像
     image_data = requests.get(image_url).content
