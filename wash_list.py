@@ -11,6 +11,7 @@ from firebase_admin import credentials, db
 import uuid
 from utils.cos_utils import upload_file_to_cos
 from utils.image_utils import compress_image
+from utils.common_utils import load_json_config
 from mutagen.mp3 import MP3
 from io import BytesIO  # 用于处理内存中的MP3数据
 
@@ -33,10 +34,19 @@ COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
 
-# ----- image generation defaults -----
-IMAGE_MODEL = "gpt-image-1"
-IMAGE_SIZE = "1024x1024"
-IMAGE_QUALITY = "standard"
+# ----- image generation config -----
+IMAGE_CONFIG_FILE = os.getenv("IMAGE_GEN_CONFIG_FILE", "image_generation_config.json")
+try:
+    image_cfg = load_json_config(IMAGE_CONFIG_FILE)
+    IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
+    IMAGE_SIZE = image_cfg.get("size", "1024x1024")
+    IMAGE_QUALITY = image_cfg.get("quality", "standard")
+    logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
+except Exception as e:
+    logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
+    IMAGE_MODEL = "gpt-image-1"
+    IMAGE_SIZE = "1024x1024"
+    IMAGE_QUALITY = "standard"
 
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
     """
