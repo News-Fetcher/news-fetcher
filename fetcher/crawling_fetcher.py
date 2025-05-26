@@ -1,7 +1,7 @@
 # fetcher/crawling_fetcher.py
 import logging
 import os
-from firecrawl import FirecrawlApp, ScrapeOptions
+from firecrawl import FirecrawlApp
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +36,12 @@ def fetch_articles_by_crawling(news_websites_crawl: dict,
             logger.info(f"[Crawling] Website: {website}, with rules: {rules}")
             crawl_status = app.crawl_url(
                 website,
-                limit=rules.get('limit', 2),
-                include_paths=include_paths,
-                exclude_paths=rules.get('excludePaths', []),
-                scrape_options=ScrapeOptions(formats=["markdown", "html"]),
+                params={
+                    "limit": rules.get('limit', 2),
+                    "includePaths": include_paths,
+                    "excludePaths": rules.get('excludePaths', []),
+                    "scrapeOptions": {"formats": ["markdown", "html"]},
+                },
                 poll_interval=1,
             )
 
