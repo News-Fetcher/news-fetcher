@@ -1,6 +1,6 @@
 openai
 pydub
-firecrawl
+firecrawl>=2.0
 pygithub
 firebase_admin
 tiktoken
