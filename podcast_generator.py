@@ -90,16 +90,10 @@ def initialize_llm_client():
 
 # 获取模型编码，用于计算 tokens
 def num_tokens_from_string(string: str, model_name: str = "gpt-4o") -> int:
-    """
-    计算给定文本在指定模型下的 token 数量
-    注意：gpt-4o 自定义模型可能需要换成类似 gpt-3.5-turbo 或别的可识别模型名称
-    """
     try:
         encoding = tiktoken.encoding_for_model(model_name)
     except KeyError:
-        # 如果自定义模型不被识别，就用一个通用编码器
         encoding = tiktoken.get_encoding("cl100k_base")
-    # 允许将特殊 token 当作普通文本处理，避免 <|endoftext|> 等触发异常
     return len(encoding.encode(string, disallowed_special=()))
 
 def safe_chat_completion_create(
@@ -567,7 +561,7 @@ def generate_news_analysis(all_summaries, client, model_name, output_folder):
         return None, ""
 
     analysis_prompt = f"""
-    请根据以下新闻摘要，给出对今日新闻的整体分析，指出主要趋势及可能的影响，控制在300字以内：
+    请根据以下新闻摘要，用中文对今日新闻进行整体分析，梳理主要趋势及可能影响。请将分析内容控制在300字以内，仅输出主持人需要播报的内容，不要包含任何说明或非播报内容。只输出主持人需要朗读的内容，不要包含开头引入、结尾句, 严禁包含任何其他说明或非播报内容, 如“【开场音乐渐入】 ”之类, 不要有小标题，语气连贯。以下是文章内容："
     {chr(10).join(all_summaries)}
     """
 
@@ -677,9 +671,9 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
         combined_text += f"\n\nArticle {idx + 1} Title: {title}\nURL: {url}\n{markdown_content}"
 
     if be_concise:
-        summary_prompt = "请综合以下多篇文章，生成简洁但完整的中文播客稿，不遗漏关键信息. 仅包含需要阅读的文本内容，不包含其他任何提示"
+        summary_prompt = "[指令] 请将以下一篇或多篇文章内容，综合整理为一份简明但完整的中文播客主持人稿件，不遗漏任何关键信息。只输出主持人需要朗读的内容，不要包含开头引入、结尾句, 严禁包含任何其他说明或非播报内容, 如“【开场音乐渐入】 ”之类, 不要有小标题，语气连贯。以下是文章内容："
     else:
-        summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息, 仅包含需要阅读的文本内容，不包含其他任何提示"
+        summary_prompt = "[指令] 请将以下一篇或多篇文章内容，综合整理为一份中文播客主持人稿件，确保内容清晰且不遗漏重要信息。只输出主持人需要朗读的内容，不要包含开头引入、结尾句,严禁包含任何其他说明或非播报内容, 如“【开场音乐渐入】 ”之类。不要有小标题，语气连贯。以下是文章内容："
 
     prompt = f"{summary_prompt}\n{combined_text}"
     max_prompt_tokens = get_max_prompt_tokens(model_name)
@@ -699,12 +693,13 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
             client=client,
             model=model_name,
             messages=[
-                {"role": "system", "content": "你是一位新闻播客撰稿人，善于整合多篇文章。"},
+                {"role": "system", "content": summary_prompt},
                 {"role": "user", "content": truncated_prompt},
             ],
             max_tokens=2048,
         )
         summary_text = response.choices[0].message.content
+        logger.debug(f"Truncated prompt:\n{truncated_prompt}")
         logger.info(f"Combined summary generated:\n{summary_text}")
 
         speech_path = Path(output_folder) / "topic_summary.mp3"
