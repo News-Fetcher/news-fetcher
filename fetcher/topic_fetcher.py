@@ -41,8 +41,16 @@ def fetch_articles_from_json(json_file: str) -> List[dict]:
     for url in url_list:
         try:
             logger.info(f"[Topic] Fetching URL: {url}")
-            options = ScrapeOptions(formats=["markdown", "html"], waitFor=wait_ms, timeout=timeout_ms)
-            result = app.scrape_url(url, options=options)
+            # options = ScrapeOptions(formats=["markdown", "html"], waitFor=wait_ms, timeout=timeout_ms)
+            # result = app.scrape_url(url, options=options)
+
+            result = app.scrape_url(
+                url,		
+                formats= [ 'markdown' ],
+                only_main_content= True,
+                wait_for= wait_ms
+            )
+
             if result and not isinstance(result, dict):
                 result = result.model_dump()
             if "markdown" in result:
