@@ -3,7 +3,7 @@ import logging
 import os
 from firecrawl import FirecrawlApp, ScrapeOptions
 
-DEFAULT_WAIT_MS = 2000
+DEFAULT_WAIT_MS = 10000
 DEFAULT_TIMEOUT_MS = 40000
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,14 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            options = ScrapeOptions(
-                formats=["markdown", "html"], waitFor=wait_ms, timeout=timeout_ms
+            # scrape_result = app.scrape_url(url, formats=["markdown", "html"], wait_for=wait_ms, timeout=timeout_ms)
+
+            scrape_result = app.scrape_url(
+                url,		
+                formats= [ 'markdown' ],
+                only_main_content= True,
+                wait_for= wait_ms
             )
-            scrape_result = app.scrape_url(url, options=options)
 
             if scrape_result and not isinstance(scrape_result, dict):
                 scrape_result = scrape_result.model_dump()
