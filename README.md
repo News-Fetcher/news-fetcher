@@ -73,6 +73,7 @@ pip install -r requirements.txt
 - `DYNAMIC_DATE_CONFIG`：动态日期配置文件路径，默认为 `news_dynamic_paths.json`。
 - `GH_ACCESS_TOKEN`：如需通过 GitHub Actions 推送结果时使用。
 - `IMAGE_GEN_CONFIG_FILE`：图片生成配置文件路径，默认为 `image_generation_config.json`。
+- `MODEL_TOKEN_LIMITS_FILE`：模型 token 限制配置文件路径，默认为 `model_token_limits.json`。
 - `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_REGION`、`COS_BUCKET`、`COS_PATH`：配置腾讯云 COS 上传所需的凭据及路径。
 
 ## 使用方法
