@@ -62,7 +62,7 @@ pip install -r requirements.txt
 - `DASHSCOPE_API_KEY`：阿里云百炼 API Key，`SUMMARY_PROVIDER=tongyi` 时使用。
 - `DASHSCOPE_MODEL`：阿里云模型名称，默认 `qwen-plus`。
 - `DEEPSEEK_API_KEY`：DeepSeek API Key，`SUMMARY_PROVIDER=deepseek` 时使用。
-- `DEEPSEEK_MODEL`：DeepSeek 模型名称，默认 `deepseek-chat`。
+ - `DEEPSEEK_MODEL`：DeepSeek 模型名称，默认 `deepseek-reasoner`。
 - `SCRAPE_WAIT_MS`：Firecrawl 抓取时额外等待的毫秒数，默认 `2000`。
 - `SCRAPE_TIMEOUT_MS`：Firecrawl 抓取的超时时间毫秒数，默认 `40000`。
 - `SUMMARY_PROVIDER`：选择 `openai`、`tongyi` 或 `deepseek` 作为摘要和文生图的提供方，默认 `tongyi`。
