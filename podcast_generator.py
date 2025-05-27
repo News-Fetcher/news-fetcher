@@ -129,34 +129,53 @@ def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_n
 
 def split_text_into_chunks(text: str, max_tokens: int, model_name: str) -> list[str]:
     """根据 token 限制将文本切分为多个块"""
+    total_tokens = num_tokens_from_string(text, model_name)
+    logger.info(
+        f"[chunk] Splitting text with total {total_tokens} tokens into chunks of {max_tokens} tokens"
+    )
+
     chunks = []
     current = ""
     for line in text.splitlines(keepends=True):
         if num_tokens_from_string(current + line, model_name) > max_tokens:
             if current:
                 chunks.append(current)
+                logger.debug(
+                    f"[chunk] Created chunk {len(chunks)} with {num_tokens_from_string(current, model_name)} tokens"
+                )
                 current = line
             else:
                 part = line
                 while num_tokens_from_string(part, model_name) > max_tokens:
                     chunks.append(part[: max_tokens])
+                    logger.debug(
+                        f"[chunk] Created chunk {len(chunks)} with {max_tokens} tokens (split overflow)"
+                    )
                     part = part[max_tokens:]
                 current = part
         else:
             current += line
     if current:
         chunks.append(current)
+        logger.debug(
+            f"[chunk] Created chunk {len(chunks)} with {num_tokens_from_string(current, model_name)} tokens"
+        )
+
+    logger.info(f"[chunk] Generated {len(chunks)} chunks in total")
     return chunks
 
 
 def summarize_text_in_chunks(text: str, summary_prompt: str, client, model_name: str, chunk_token_limit: int = 8000) -> str:
     """对过长文本按块总结，再综合所有块的结果"""
     chunks = split_text_into_chunks(text, chunk_token_limit, model_name)
+    logger.info(f"[chunk] Summarizing text in {len(chunks)} chunks")
     if len(chunks) == 1:
         return chunks[0]
 
     chunk_summaries = []
-    for chunk in chunks:
+    for idx, chunk in enumerate(chunks, start=1):
+        token_count = num_tokens_from_string(chunk, model_name)
+        logger.info(f"[chunk] Summarizing chunk {idx}/{len(chunks)} with {token_count} tokens")
         part_prompt = f"{summary_prompt}\n{chunk}"
         truncated = truncate_text_to_fit_model(part_prompt, chunk_token_limit, model_name)
         resp = safe_chat_completion_create(
@@ -168,7 +187,9 @@ def summarize_text_in_chunks(text: str, summary_prompt: str, client, model_name:
             ],
             max_tokens=1024,
         )
-        chunk_summaries.append(resp.choices[0].message.content.strip())
+        chunk_summary = resp.choices[0].message.content.strip()
+        logger.debug(f"[chunk] Summary for chunk {idx}: {chunk_summary}")
+        chunk_summaries.append(chunk_summary)
 
     combined_prompt = "请综合以下分块摘要，生成最终摘要：\n" + "\n".join(chunk_summaries)
     final_resp = safe_chat_completion_create(
