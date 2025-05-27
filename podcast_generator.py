@@ -127,6 +127,62 @@ def truncate_text_to_fit_model(prompt_text: str, max_prompt_tokens: int, model_n
     return truncated
 
 
+def split_text_into_chunks(text: str, max_tokens: int, model_name: str) -> list[str]:
+    """根据 token 限制将文本切分为多个块"""
+    chunks = []
+    current = ""
+    for line in text.splitlines(keepends=True):
+        if num_tokens_from_string(current + line, model_name) > max_tokens:
+            if current:
+                chunks.append(current)
+                current = line
+            else:
+                part = line
+                while num_tokens_from_string(part, model_name) > max_tokens:
+                    chunks.append(part[: max_tokens])
+                    part = part[max_tokens:]
+                current = part
+        else:
+            current += line
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def summarize_text_in_chunks(text: str, summary_prompt: str, client, model_name: str, chunk_token_limit: int = 8000) -> str:
+    """对过长文本按块总结，再综合所有块的结果"""
+    chunks = split_text_into_chunks(text, chunk_token_limit, model_name)
+    if len(chunks) == 1:
+        return chunks[0]
+
+    chunk_summaries = []
+    for chunk in chunks:
+        part_prompt = f"{summary_prompt}\n{chunk}"
+        truncated = truncate_text_to_fit_model(part_prompt, chunk_token_limit, model_name)
+        resp = safe_chat_completion_create(
+            client=client,
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。"},
+                {"role": "user", "content": truncated},
+            ],
+            max_tokens=1024,
+        )
+        chunk_summaries.append(resp.choices[0].message.content.strip())
+
+    combined_prompt = "请综合以下分块摘要，生成最终摘要：\n" + "\n".join(chunk_summaries)
+    final_resp = safe_chat_completion_create(
+        client=client,
+        model=model_name,
+        messages=[
+            {"role": "system", "content": "你是一位新闻工作者或播客主持人，负责播报新闻或提供信息。"},
+            {"role": "user", "content": combined_prompt},
+        ],
+        max_tokens=1024,
+    )
+    return final_resp.choices[0].message.content.strip()
+
+
 def summarize_and_tts_articles(news_articles, client, model_name, output_folder, be_concise=False):
     local_mp3_files = []
     all_summaries = []
@@ -167,16 +223,21 @@ def summarize_and_tts_articles(news_articles, client, model_name, output_folder,
         {markdown_content}
         """
 
-        # ========== 新增：截断处理，假设我们想让 prompt + 回答 <= 8000 tokens, 其中回答max 2048 tokens => prompt部分留 5000 tokens 左右 ==========
-        truncated_prompt = truncate_text_to_fit_model(
-            single_article_prompt,
-            max_prompt_tokens=20000,   # 这里可根据需要调整
-            model_name=model_name
-        )
-        # =================================================================================================
-
-        try:
-            # ========== 新增：使用 safe_chat_completion_create，带重试 + 限制max_tokens ==========
+        prompt_tokens = num_tokens_from_string(single_article_prompt, model_name)
+        if prompt_tokens > 20000:
+            article_summary = summarize_text_in_chunks(
+                markdown_content,
+                summary_require_prompt,
+                client,
+                model_name,
+                chunk_token_limit=18000,
+            )
+        else:
+            truncated_prompt = truncate_text_to_fit_model(
+                single_article_prompt,
+                max_prompt_tokens=20000,
+                model_name=model_name
+            )
             article_response = safe_chat_completion_create(
                 client=client,
                 model=model_name,
@@ -196,61 +257,59 @@ def summarize_and_tts_articles(news_articles, client, model_name, output_folder,
                 ],
                 max_retries=3,
                 initial_delay=1.0,
-                max_tokens=2048  # 对生成结果做一个上限, 防止太长
+                max_tokens=2048
             )
-            # ============================================================================================
-
             article_summary = article_response.choices[0].message.content
-            logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
+        logger.info(f"Summary for article {idx + 1}:\n{article_summary}")
 
-            all_summaries.append(article_summary)
-            add_url_to_fetched(url)  # 将 URL 加入已抓取列表
+        all_summaries.append(article_summary)
+        add_url_to_fetched(url)  # 将 URL 加入已抓取列表
 
-            # 调用阿里云百炼语音合成
-            url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:8]
-            domain = extract_domain(url)
-            safe_domain = re.sub(r'[^\w.-]', '_', domain)
-            filename = f"summary_{safe_domain}_{url_hash}.mp3"
-            speech_file_path = Path(output_folder) / filename
+        # 调用阿里云百炼语音合成
+        url_hash = hashlib.sha256(url.encode('utf-8')).hexdigest()[:8]
+        domain = extract_domain(url)
+        safe_domain = re.sub(r'[^\w.-]', '_', domain)
+        filename = f"summary_{safe_domain}_{url_hash}.mp3"
+        speech_file_path = Path(output_folder) / filename
+        
+        # 使用阿里云百炼语音合成API - 使用同步方式
+        try:
+            # 限制文本长度，避免过长导致错误
+            max_text_length = 5000
+            if len(article_summary) > max_text_length:
+                logger.warning(f"Article {idx + 1} summary too long ({len(article_summary)} chars), truncating to {max_text_length} chars")
+                article_summary = article_summary[:max_text_length]
             
-            # 使用阿里云百炼语音合成API - 使用同步方式
-            try:
-                # 限制文本长度，避免过长导致错误
-                max_text_length = 5000
-                if len(article_summary) > max_text_length:
-                    logger.warning(f"Article {idx + 1} summary too long ({len(article_summary)} chars), truncating to {max_text_length} chars")
-                    article_summary = article_summary[:max_text_length]
-                
-                # 创建语音合成器并调用 - 使用同步方式
-                tts_synthesizer = SpeechSynthesizer(
-                    model="cosyvoice-v1", 
-                    voice="longxiaochun",  # 默认使用龙小淳音色
-                    format=AudioFormat.MP3_22050HZ_MONO_256KBPS,  # 使用MP3格式，22050Hz采样率
-                    speech_rate=1.0  # 语速1.0倍，对应OpenAI的speed=1.0
-                )
-                
-                # 调用语音合成 - 同步方式
-                logger.info(f"Starting TTS for article {idx + 1} with length {len(article_summary)} chars")
-                audio_data = tts_synthesizer.call(article_summary)
-                
-                # 检查音频数据是否为空
-                if audio_data is None:
-                    logger.error(f"No audio data received for article {idx + 1}")
-                    continue
-                
-                # 将合成的音频保存到文件
-                with open(speech_file_path, 'wb') as f:
-                    f.write(audio_data)
-                
-                # 验证文件是否正确保存
-                if os.path.exists(speech_file_path) and os.path.getsize(speech_file_path) > 0:
-                    local_mp3_files.append(speech_file_path)
-                    logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}, size: {os.path.getsize(speech_file_path)} bytes")
-                else:
-                    logger.error(f"Failed to save audio for article {idx + 1} or file is empty")
-                
-            except Exception as e:
-                logger.error(f"Error in CosyVoice TTS for article {idx + 1}: {e}", exc_info=True)
+            # 创建语音合成器并调用 - 使用同步方式
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1", 
+                voice="longxiaochun",  # 默认使用龙小淳音色
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,  # 使用MP3格式，22050Hz采样率
+                speech_rate=1.0  # 语速1.0倍，对应OpenAI的speed=1.0
+            )
+            
+            # 调用语音合成 - 同步方式
+            logger.info(f"Starting TTS for article {idx + 1} with length {len(article_summary)} chars")
+            audio_data = tts_synthesizer.call(article_summary)
+            
+            # 检查音频数据是否为空
+            if audio_data is None:
+                logger.error(f"No audio data received for article {idx + 1}")
+                continue
+            
+            # 将合成的音频保存到文件
+            with open(speech_file_path, 'wb') as f:
+                f.write(audio_data)
+            
+            # 验证文件是否正确保存
+            if os.path.exists(speech_file_path) and os.path.getsize(speech_file_path) > 0:
+                local_mp3_files.append(speech_file_path)
+                logger.info(f"Audio saved for article {idx + 1}: {speech_file_path}, size: {os.path.getsize(speech_file_path)} bytes")
+            else:
+                logger.error(f"Failed to save audio for article {idx + 1} or file is empty")
+            
+        except Exception as e:
+            logger.error(f"Error in CosyVoice TTS for article {idx + 1}: {e}", exc_info=True)
                 
         except Exception as e:
             logger.error(f"Error summarizing or TTS for article {idx + 1}: {e}")
@@ -572,9 +631,17 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
         summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息："
 
     prompt = f"{summary_prompt}\n{combined_text}"
-    truncated_prompt = truncate_text_to_fit_model(prompt, max_prompt_tokens=20000, model_name=model_name)
-
-    try:
+    prompt_tokens = num_tokens_from_string(prompt, model_name)
+    if prompt_tokens > 20000:
+        summary_text = summarize_text_in_chunks(
+            combined_text,
+            summary_prompt,
+            client,
+            model_name,
+            chunk_token_limit=18000,
+        )
+    else:
+        truncated_prompt = truncate_text_to_fit_model(prompt, max_prompt_tokens=20000, model_name=model_name)
         response = safe_chat_completion_create(
             client=client,
             model=model_name,
@@ -603,8 +670,8 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
                 return [speech_path], summary_text
         except Exception as e:
             logger.error(f"Error generating TTS for combined summary: {e}")
-    except Exception as e:
-        logger.error(f"Error generating combined summary: {e}")
+        except Exception as e:
+            logger.error(f"Error generating combined summary: {e}")
 
     return [], ""
 
