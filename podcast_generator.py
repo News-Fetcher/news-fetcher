@@ -36,6 +36,32 @@ except Exception as e:
     IMAGE_SIZE = "1024x1024"
     IMAGE_QUALITY = "medium"
 
+# Load model token limit config
+MODEL_TOKEN_LIMITS_FILE = os.getenv("MODEL_TOKEN_LIMITS_FILE", "model_token_limits.json")
+try:
+    _model_token_cfg = load_json_config(MODEL_TOKEN_LIMITS_FILE)
+    DEFAULT_MAX_PROMPT_TOKENS = _model_token_cfg.get("default_max_prompt_tokens", 20000)
+    CHUNK_TOKEN_MARGIN = _model_token_cfg.get("chunk_token_margin", 2000)
+    MODEL_MAX_PROMPT_TOKENS = _model_token_cfg.get("models", {})
+    logger.info(f"Loaded model token limits from {MODEL_TOKEN_LIMITS_FILE}")
+except Exception as e:
+    logger.error(f"Failed to load {MODEL_TOKEN_LIMITS_FILE}: {e}")
+    DEFAULT_MAX_PROMPT_TOKENS = 20000
+    CHUNK_TOKEN_MARGIN = 2000
+    MODEL_MAX_PROMPT_TOKENS = {}
+
+
+def get_max_prompt_tokens(model_name: str) -> int:
+    """Get max prompt tokens for the given model."""
+    return int(MODEL_MAX_PROMPT_TOKENS.get(model_name, DEFAULT_MAX_PROMPT_TOKENS))
+
+
+def get_chunk_token_limit(model_name: str) -> int:
+    """Return chunk token limit for summarization."""
+    max_prompt = get_max_prompt_tokens(model_name)
+    chunk_limit = max_prompt - CHUNK_TOKEN_MARGIN
+    return chunk_limit if chunk_limit > 0 else max_prompt
+
 # 根据环境变量初始化 LLM 客户端
 def initialize_llm_client():
     """Return (client, model_name) based on SUMMARY_PROVIDER env."""
@@ -246,19 +272,21 @@ def summarize_and_tts_articles(news_articles, client, model_name, output_folder,
         {markdown_content}
         """
 
+        max_prompt_tokens = get_max_prompt_tokens(model_name)
+        chunk_limit = get_chunk_token_limit(model_name)
         prompt_tokens = num_tokens_from_string(single_article_prompt, model_name)
-        if prompt_tokens > 20000:
+        if prompt_tokens > max_prompt_tokens:
             article_summary = summarize_text_in_chunks(
                 markdown_content,
                 summary_require_prompt,
                 client,
                 model_name,
-                chunk_token_limit=18000,
+                chunk_token_limit=chunk_limit,
             )
         else:
             truncated_prompt = truncate_text_to_fit_model(
                 single_article_prompt,
-                max_prompt_tokens=20000,
+                max_prompt_tokens=max_prompt_tokens,
                 model_name=model_name
             )
             article_response = safe_chat_completion_create(
@@ -654,17 +682,19 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
         summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息, 仅包含需要阅读的文本内容，不包含其他任何提示"
 
     prompt = f"{summary_prompt}\n{combined_text}"
+    max_prompt_tokens = get_max_prompt_tokens(model_name)
+    chunk_limit = get_chunk_token_limit(model_name)
     prompt_tokens = num_tokens_from_string(prompt, model_name)
-    if prompt_tokens > 20000:
+    if prompt_tokens > max_prompt_tokens:
         summary_text = summarize_text_in_chunks(
             combined_text,
             summary_prompt,
             client,
             model_name,
-            chunk_token_limit=18000,
+            chunk_token_limit=chunk_limit,
         )
     else:
-        truncated_prompt = truncate_text_to_fit_model(prompt, max_prompt_tokens=20000, model_name=model_name)
+        truncated_prompt = truncate_text_to_fit_model(prompt, max_prompt_tokens=max_prompt_tokens, model_name=model_name)
         response = safe_chat_completion_create(
             client=client,
             model=model_name,

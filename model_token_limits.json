@@ -1,0 +1,7 @@
+{
+  "default_max_prompt_tokens": 20000,
+  "chunk_token_margin": 2000,
+  "models": {
+    "deepseek-reasoner": 64000
+  }
+}
