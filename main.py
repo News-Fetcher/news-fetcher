@@ -6,9 +6,10 @@ from pathlib import Path
 
 from fetcher.scraping_fetcher import fetch_articles_by_scraping
 from fetcher.crawling_fetcher import fetch_articles_by_crawling
+from fetcher.topic_fetcher import fetch_articles_from_json
 from utils.common_utils import load_json_config
 from utils.firebase_utils import initialize_firebase
-from podcast_generator import generate_full_podcast
+from podcast_generator import generate_full_podcast, generate_topic_podcast
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
@@ -67,12 +68,15 @@ def main():
         logger.error(f"Failed to load news_websites_scraping configuration: {e}")
         news_websites_scraping = {}
 
-    # 6. 获取新闻文章（抓取/爬取）
+    # 6. 获取新闻文章（抓取/爬取/专题列表）
     if fetcher_method == "scraping":
         all_articles = fetch_articles_by_scraping(news_websites_scraping)
     elif fetcher_method == "crawling":
         all_articles = fetch_articles_by_crawling(news_websites_crawl,
                                                  dynamic_paths)
+    elif fetcher_method == "topic":
+        topic_file = os.getenv("TOPIC_URLS_FILE", "news_websites_scraping.json")
+        all_articles = fetch_articles_from_json(topic_file)
     else:
         logger.warning("Unknown FETCHER_METHOD. No articles fetched.")
         all_articles = []
@@ -81,7 +85,10 @@ def main():
     output_folder = "podcast_audio"
     Path(output_folder).mkdir(exist_ok=True)
 
-    generate_full_podcast(all_articles, output_folder)
+    if fetcher_method == "topic":
+        generate_topic_podcast(all_articles, output_folder)
+    else:
+        generate_full_podcast(all_articles, output_folder)
 
     logger.info("All done!")
 

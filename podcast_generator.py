@@ -551,3 +551,102 @@ def generate_full_podcast(all_articles, output_folder):
         logger.info(f"Podcast uploaded successfully! {audio_public_url}")
     else:
         logger.warning("Failed to upload the final podcast.")
+
+
+def summarize_all_articles(news_articles, client, model_name, output_folder, be_concise=False):
+    """Summarize all fetched articles together and generate one TTS audio."""
+    combined_text = ""
+    for idx, article in enumerate(news_articles):
+        if not isinstance(article, dict):
+            article = article.model_dump()
+        url = article.get('metadata', {}).get('sourceURL', '')
+        title = article.get('metadata', {}).get('title', '')
+        markdown_content = article.get('markdown', '')
+        if not markdown_content:
+            continue
+        combined_text += f"\n\nArticle {idx + 1} Title: {title}\nURL: {url}\n{markdown_content}"
+
+    if be_concise:
+        summary_prompt = "请综合以下多篇文章，生成简洁但完整的中文播客稿，不遗漏关键信息："
+    else:
+        summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息："
+
+    prompt = f"{summary_prompt}\n{combined_text}"
+    truncated_prompt = truncate_text_to_fit_model(prompt, max_prompt_tokens=20000, model_name=model_name)
+
+    try:
+        response = safe_chat_completion_create(
+            client=client,
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "你是一位新闻播客撰稿人，善于整合多篇文章。"},
+                {"role": "user", "content": truncated_prompt},
+            ],
+            max_tokens=2048,
+        )
+        summary_text = response.choices[0].message.content
+        logger.info(f"Combined summary generated:\n{summary_text}")
+
+        speech_path = Path(output_folder) / "topic_summary.mp3"
+        try:
+            tts_synthesizer = SpeechSynthesizer(
+                model="cosyvoice-v1",
+                voice="longxiaochun",
+                format=AudioFormat.MP3_22050HZ_MONO_256KBPS,
+                speech_rate=1.0,
+            )
+            audio_data = tts_synthesizer.call(summary_text)
+            if audio_data is not None:
+                with open(speech_path, 'wb') as f:
+                    f.write(audio_data)
+                logger.info(f"Summary audio saved: {speech_path}")
+                return [speech_path], summary_text
+        except Exception as e:
+            logger.error(f"Error generating TTS for combined summary: {e}")
+    except Exception as e:
+        logger.error(f"Error generating combined summary: {e}")
+
+    return [], ""
+
+
+def generate_topic_podcast(all_articles, output_folder):
+    """Generate a podcast from articles of a single topic in one summary."""
+    if not all_articles:
+        logger.warning("No articles to process. Aborting topic podcast generation.")
+        return
+
+    client, model_name = initialize_llm_client()
+    be_concise = (os.getenv("BE_CONCISE") == "true")
+
+    summary_mp3, summary_text = summarize_all_articles(all_articles, client, model_name, output_folder, be_concise)
+
+    analysis_mp3, analysis_text = generate_news_analysis([summary_text], client, model_name, output_folder)
+
+    intro_ending_mp3, title, description, tags, img_url = generate_intro_ending([summary_text], client, model_name, output_folder)
+
+    mp3_to_merge = [intro_ending_mp3[0]] + summary_mp3
+    if analysis_mp3:
+        mp3_to_merge.append(analysis_mp3)
+    mp3_to_merge.append(intro_ending_mp3[1])
+
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    final_podcast_filename = f"{today_date}_{title}.mp3"
+    final_podcast_path = Path(output_folder) / final_podcast_filename
+    merge_audio_files(mp3_to_merge, final_podcast_path)
+
+    sha256_hash = calculate_sha256(str(final_podcast_path))
+    from utils.firebase_utils import upload_to_firebase_storage
+    audio_public_url, file_sha256 = upload_to_firebase_storage(
+        local_file_path=str(final_podcast_path),
+        title=title,
+        description=description,
+        sha256_hash=sha256_hash,
+        img_url=img_url,
+        tags=tags,
+    )
+
+    if audio_public_url:
+        logger.info(f"Podcast uploaded successfully! {audio_public_url}")
+    else:
+        logger.warning("Failed to upload the final podcast.")
+
