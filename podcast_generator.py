@@ -649,9 +649,9 @@ def summarize_all_articles(news_articles, client, model_name, output_folder, be_
         combined_text += f"\n\nArticle {idx + 1} Title: {title}\nURL: {url}\n{markdown_content}"
 
     if be_concise:
-        summary_prompt = "请综合以下多篇文章，生成简洁但完整的中文播客稿，不遗漏关键信息："
+        summary_prompt = "请综合以下多篇文章，生成简洁但完整的中文播客稿，不遗漏关键信息. 仅包含需要阅读的文本内容，不包含其他任何提示"
     else:
-        summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息："
+        summary_prompt = "请综合以下多篇文章内容，生成中文播客稿，要求条理清晰且不要遗漏重要信息, 仅包含需要阅读的文本内容，不包含其他任何提示"
 
     prompt = f"{summary_prompt}\n{combined_text}"
     prompt_tokens = num_tokens_from_string(prompt, model_name)
