@@ -40,8 +40,8 @@ def send_post_request(url, payload, headers):
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=10)
         logger.info(f"Received response with status code: {response.status_code}")
-        logger.debug(f"Response headers: {response.headers}")
-        logger.debug(f"Response content: {response.text}")
+        logger.info(f"Response headers: {response.headers}")
+        logger.info(f"Response content: {response.text}")
 
         response.raise_for_status()  # Raise HTTPError for bad responses
 

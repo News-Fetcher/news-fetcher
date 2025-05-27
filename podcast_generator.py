@@ -140,7 +140,7 @@ def split_text_into_chunks(text: str, max_tokens: int, model_name: str) -> list[
         if num_tokens_from_string(current + line, model_name) > max_tokens:
             if current:
                 chunks.append(current)
-                logger.debug(
+                logger.info(
                     f"[chunk] Created chunk {len(chunks)} with {num_tokens_from_string(current, model_name)} tokens"
                 )
                 current = line
@@ -148,7 +148,7 @@ def split_text_into_chunks(text: str, max_tokens: int, model_name: str) -> list[
                 part = line
                 while num_tokens_from_string(part, model_name) > max_tokens:
                     chunks.append(part[: max_tokens])
-                    logger.debug(
+                    logger.info(
                         f"[chunk] Created chunk {len(chunks)} with {max_tokens} tokens (split overflow)"
                     )
                     part = part[max_tokens:]
@@ -157,7 +157,7 @@ def split_text_into_chunks(text: str, max_tokens: int, model_name: str) -> list[
             current += line
     if current:
         chunks.append(current)
-        logger.debug(
+        logger.info(
             f"[chunk] Created chunk {len(chunks)} with {num_tokens_from_string(current, model_name)} tokens"
         )
 
@@ -188,7 +188,7 @@ def summarize_text_in_chunks(text: str, summary_prompt: str, client, model_name:
             max_tokens=1024,
         )
         chunk_summary = resp.choices[0].message.content.strip()
-        logger.debug(f"[chunk] Summary for chunk {idx}: {chunk_summary}")
+        logger.info(f"[chunk] Summary for chunk {idx}: {chunk_summary}")
         chunk_summaries.append(chunk_summary)
 
     combined_prompt = "请综合以下分块摘要，生成最终摘要：\n" + "\n".join(chunk_summaries)
@@ -230,9 +230,9 @@ def summarize_and_tts_articles(news_articles, client, model_name, output_folder,
 
         # 生成摘要提示语
         if be_concise:
-            summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Please be very very concise"
+            summary_require_prompt = "请将本文以对话式、适合播客风格的中文极度简明扼要的播客稿子，要包含开头或结尾, 不要包含任何解释"
         else:
-            summary_require_prompt = "Summarize this single article into a conversational, podcast-friendly style in Chinese. Explain the content in detail without an introduction or conclusion:"
+            summary_require_prompt = "请将本文以对话式、适合播客风格的中文详细播客稿子，仅仅包含文本，不要包含开头或结尾, 不要包含任何解释"
 
         single_article_prompt = f"""
         {summary_require_prompt}
