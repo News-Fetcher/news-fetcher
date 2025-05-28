@@ -27,21 +27,23 @@ def main():
     logger.info(f"FETCHER_METHOD: {fetcher_method}")
 
     # 3. 根据配置动态生成 includePaths
-    dynamic_config_file = os.getenv("DYNAMIC_DATE_CONFIG", "news_dynamic_paths.json")
+    config_file = os.getenv("CONFIG_FILE", "config.json")
     try:
-        dynamic_config = load_json_config(dynamic_config_file)
-        dynamic_paths = {}
-        for keyword, info in dynamic_config.items():
-            fmt = info.get("date_format", "%Y-%m-%d")
-            offsets = info.get("days_offset", [0])
-            dynamic_paths[keyword] = [
-                (datetime.now() + timedelta(days=off)).strftime(fmt)
-                for off in offsets
-            ]
-        logger.info(f"Successfully loaded {dynamic_config_file} configuration.")
+        global_cfg = load_json_config(config_file)
+        logger.info(f"Successfully loaded {config_file} configuration.")
     except Exception as e:
-        logger.error(f"Failed to load {dynamic_config_file}: {e}")
-        dynamic_paths = {}
+        logger.error(f"Failed to load {config_file}: {e}")
+        global_cfg = {}
+
+    dynamic_paths = {}
+    dynamic_config = global_cfg.get("news_dynamic_paths", {})
+    for keyword, info in dynamic_config.items():
+        fmt = info.get("date_format", "%Y-%m-%d")
+        offsets = info.get("days_offset", [0])
+        dynamic_paths[keyword] = [
+            (datetime.now() + timedelta(days=off)).strftime(fmt)
+            for off in offsets
+        ]
     
     logger.info(f"dynamic_paths: {dynamic_paths}")
 
