@@ -27,45 +27,30 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Load image generation config
-IMAGE_CONFIG_FILE = os.getenv("IMAGE_GEN_CONFIG_FILE", "image_generation_config.json")
+# Load unified configuration
+CONFIG_FILE = os.getenv("CONFIG_FILE", "config.json")
 try:
-    image_cfg = load_json_config(IMAGE_CONFIG_FILE)
-    IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
-    IMAGE_SIZE = image_cfg.get("size", "1024x1024")
-    IMAGE_QUALITY = image_cfg.get("quality", "medium")
-    logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
+    _config = load_json_config(CONFIG_FILE)
+    logger.info(f"Loaded config from {CONFIG_FILE}")
 except Exception as e:
-    logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
-    IMAGE_MODEL = "gpt-image-1"
-    IMAGE_SIZE = "1024x1024"
-    IMAGE_QUALITY = "medium"
+    logger.error(f"Failed to load {CONFIG_FILE}: {e}")
+    _config = {}
 
-# Load model token limit config
-MODEL_TOKEN_LIMITS_FILE = os.getenv(
-    "MODEL_TOKEN_LIMITS_FILE", "model_token_limits.json"
-)
-try:
-    _model_token_cfg = load_json_config(MODEL_TOKEN_LIMITS_FILE)
-    DEFAULT_MAX_PROMPT_TOKENS = _model_token_cfg.get("default_max_prompt_tokens", 20000)
-    CHUNK_TOKEN_MARGIN = _model_token_cfg.get("chunk_token_margin", 2000)
-    MODEL_MAX_PROMPT_TOKENS = _model_token_cfg.get("models", {})
-    logger.info(f"Loaded model token limits from {MODEL_TOKEN_LIMITS_FILE}")
-except Exception as e:
-    logger.error(f"Failed to load {MODEL_TOKEN_LIMITS_FILE}: {e}")
-    DEFAULT_MAX_PROMPT_TOKENS = 20000
-    CHUNK_TOKEN_MARGIN = 2000
-    MODEL_MAX_PROMPT_TOKENS = {}
+# Image generation settings
+image_cfg = _config.get("image_generation", {})
+IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
+IMAGE_SIZE = image_cfg.get("size", "1024x1024")
+IMAGE_QUALITY = image_cfg.get("quality", "medium")
 
-# ----- prompt config -----
-PROMPT_CONFIG_FILE = os.getenv("PROMPT_CONFIG_FILE", "prompts.json")
-try:
-    prompt_cfg = load_json_config(PROMPT_CONFIG_FILE)
-    PROMPTS = prompt_cfg.get("podcast_generator", {})
-    logger.info(f"Loaded prompt config from {PROMPT_CONFIG_FILE}")
-except Exception as e:
-    logger.error(f"Failed to load {PROMPT_CONFIG_FILE}: {e}")
-    PROMPTS = {}
+# Model token limits
+_model_token_cfg = _config.get("model_token_limits", {})
+DEFAULT_MAX_PROMPT_TOKENS = _model_token_cfg.get("default_max_prompt_tokens", 20000)
+CHUNK_TOKEN_MARGIN = _model_token_cfg.get("chunk_token_margin", 2000)
+MODEL_MAX_PROMPT_TOKENS = _model_token_cfg.get("models", {})
+
+# Prompt settings
+prompt_cfg = _config.get("prompts", {})
+PROMPTS = prompt_cfg.get("podcast_generator", {})
 
 
 def get_max_prompt_tokens(model_name: str) -> int:

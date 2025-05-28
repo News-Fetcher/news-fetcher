@@ -36,29 +36,22 @@ COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.
 # MP3文件的基础URL
 MP3_BASE_URL = "https://downloadfile-a6lubplbza-uc.a.run.app?filename="
 
-# ----- image generation config -----
-IMAGE_CONFIG_FILE = os.getenv("IMAGE_GEN_CONFIG_FILE", "image_generation_config.json")
+# ----- unified configuration -----
+CONFIG_FILE = os.getenv("CONFIG_FILE", "config.json")
 try:
-    image_cfg = load_json_config(IMAGE_CONFIG_FILE)
-    IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
-    IMAGE_SIZE = image_cfg.get("size", "1024x1024")
-    IMAGE_QUALITY = image_cfg.get("quality", "medium")
-    logger.info(f"Loaded image config from {IMAGE_CONFIG_FILE}")
+    _config = load_json_config(CONFIG_FILE)
+    logger.info(f"Loaded config from {CONFIG_FILE}")
 except Exception as e:
-    logger.error(f"Failed to load {IMAGE_CONFIG_FILE}: {e}")
-    IMAGE_MODEL = "gpt-image-1"
-    IMAGE_SIZE = "1024x1024"
-    IMAGE_QUALITY = "medium"
+    logger.error(f"Failed to load {CONFIG_FILE}: {e}")
+    _config = {}
 
-# ----- prompt config -----
-PROMPT_CONFIG_FILE = os.getenv("PROMPT_CONFIG_FILE", "prompts.json")
-try:
-    prompt_cfg = load_json_config(PROMPT_CONFIG_FILE)
-    WASH_PROMPTS = prompt_cfg.get("wash_list", {})
-    logger.info(f"Loaded prompt config from {PROMPT_CONFIG_FILE}")
-except Exception as e:
-    logger.error(f"Failed to load {PROMPT_CONFIG_FILE}: {e}")
-    WASH_PROMPTS = {}
+image_cfg = _config.get("image_generation", {})
+IMAGE_MODEL = image_cfg.get("model", "gpt-image-1")
+IMAGE_SIZE = image_cfg.get("size", "1024x1024")
+IMAGE_QUALITY = image_cfg.get("quality", "medium")
+
+prompt_cfg = _config.get("prompts", {})
+WASH_PROMPTS = prompt_cfg.get("wash_list", {})
 
 
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
