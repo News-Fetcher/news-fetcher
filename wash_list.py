@@ -16,17 +16,19 @@ from mutagen.mp3 import MP3
 from io import BytesIO  # 用于处理内存中的MP3数据
 
 # 设置日志记录
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger()
 client = OpenAI()
 
 # ===== 新增/调整标志位 =====
-WASH_IMAGES = False             # 本次是否wash图片
-WASH_TAGS = True               # 本次是否wash tags
-WASH_TOTAL_DURATION = True     # 本次是否wash total_duration
-DELETE_SHORT_AUDIO = True      # 本次是否删除时长小于2分钟（120秒）的播客
-MIGRATE_IMAGES = True          # 是否迁移已有图片到COS
-COMPRESS_EXISTING_IMAGES = True # 当图片已经在COS中时是否仍重新压缩并上传
+WASH_IMAGES = False  # 本次是否wash图片
+WASH_TAGS = True  # 本次是否wash tags
+WASH_TOTAL_DURATION = True  # 本次是否wash total_duration
+DELETE_SHORT_AUDIO = True  # 本次是否删除时长小于2分钟（120秒）的播客
+MIGRATE_IMAGES = True  # 是否迁移已有图片到COS
+COMPRESS_EXISTING_IMAGES = True  # 当图片已经在COS中时是否仍重新压缩并上传
 
 # 已上传至腾讯云COS的图片基准 URL 前缀
 COS_IMAGE_BASE_URL = "https://news-fetcher-1307107697.cos.ap-guangzhou.myqcloud.com/"
@@ -48,6 +50,17 @@ except Exception as e:
     IMAGE_SIZE = "1024x1024"
     IMAGE_QUALITY = "medium"
 
+# ----- prompt config -----
+PROMPT_CONFIG_FILE = os.getenv("PROMPT_CONFIG_FILE", "prompts.json")
+try:
+    prompt_cfg = load_json_config(PROMPT_CONFIG_FILE)
+    WASH_PROMPTS = prompt_cfg.get("wash_list", {})
+    logger.info(f"Loaded prompt config from {PROMPT_CONFIG_FILE}")
+except Exception as e:
+    logger.error(f"Failed to load {PROMPT_CONFIG_FILE}: {e}")
+    WASH_PROMPTS = {}
+
+
 def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
     """
     通用指数退避重试函数:
@@ -66,12 +79,14 @@ def exponential_backoff_retry(func, *args, max_retries=5, **kwargs):
                 time.sleep(delay)
                 delay *= 2
 
+
 def generate_img_url(title, description):
     logging.info("生成图片URL...")
     output_folder = "wash_list_image"
     os.makedirs(output_folder, exist_ok=True)
 
-    image_prompt = f"为播客《{title}》创建一个专业且具有视觉吸引力的博客封面，反映主题：{description} 设计应现代、引人注目，适合新闻播客。注意内容不要太过杂乱，简洁"
+    prompt_template = WASH_PROMPTS.get("image_prompt")
+    image_prompt = prompt_template.format(title=title, description=description)
     logger.info(f"使用提示语生成博客封面图像：{image_prompt}")
 
     # 使用指数退避重试生成图像
@@ -81,7 +96,7 @@ def generate_img_url(title, description):
         prompt=image_prompt,
         n=1,
         size=IMAGE_SIZE,
-        quality=IMAGE_QUALITY
+        quality=IMAGE_QUALITY,
     )
 
     image_url = intro_response.data[0].url
@@ -102,17 +117,19 @@ def generate_img_url(title, description):
 
     return img_url
 
+
 def generate_tags_by_description(description, historical_tags):
-    logging.info(f"生成标签，历史标签: {', '.join(historical_tags)}，描述: {description}")
-    prompt = f"""
-    请从以下描述中提取最相关的关键词，用于表示本期播客的内容方向，以Json数组形式返回，不要超过4个,不要包含句子只要词语。 历史标签可供参考选择，但不要局限于历史标签。
-    历史标签: {', '.join(historical_tags)}
-    描述: {description}
-    """
+    logging.info(
+        f"生成标签，历史标签: {', '.join(historical_tags)}，描述: {description}"
+    )
+    prompt_template = WASH_PROMPTS.get("tag_prompt")
+    prompt = prompt_template.format(
+        description=description, historical_tags=", ".join(historical_tags)
+    )
     completion = exponential_backoff_retry(
         client.chat.completions.create,
         model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": prompt}],
     )
     content = completion.choices[0].message.content.strip()
 
@@ -133,7 +150,7 @@ def generate_tags_by_description(description, historical_tags):
     except json.JSONDecodeError as e:
         logger.error(f"JSON解析错误: {e}")
         tags = []
-    
+
     tags = tags[:4]
 
     for tag in tags:
@@ -142,6 +159,7 @@ def generate_tags_by_description(description, historical_tags):
 
     logging.info(f"生成的最终标签列表: {tags}")
     return tags
+
 
 def calculate_mp3_duration(mp3_url):
     """
@@ -185,14 +203,18 @@ def migrate_image_to_cos(image_url, recompress=False):
         logger.error(f"迁移图片失败 {image_url}：{e}")
         return image_url
 
+
 def main():
     logging.info("开始处理播客列表...")
 
     cred = credentials.Certificate("./serviceAccountKey.json")
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app',
-        'storageBucket': 'news-fetcher-platform.firebasestorage.app'
-    })
+    firebase_admin.initialize_app(
+        cred,
+        {
+            "databaseURL": "https://news-fetcher-platform-default-rtdb.asia-southeast1.firebasedatabase.app",
+            "storageBucket": "news-fetcher-platform.firebasestorage.app",
+        },
+    )
 
     with open("list_to_wash.json", "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -224,7 +246,9 @@ def main():
 
         # 若缺img_url且WASH_IMAGES为True则生成
         if WASH_IMAGES and "img_url" not in podcast:
-            podcast["img_url"] = generate_img_url(cleaned_title, podcast.get("description", ""))
+            podcast["img_url"] = generate_img_url(
+                cleaned_title, podcast.get("description", "")
+            )
 
         # 生成标签
         description = podcast.get("description", "")
@@ -240,16 +264,19 @@ def main():
                 duration = calculate_mp3_duration(mp3_url)
                 if duration is not None:
                     podcast["total_duration"] = duration
-                    logger.info(f"播客 {cleaned_title} 的 total_duration 计算成功: {duration} 秒")
+                    logger.info(
+                        f"播客 {cleaned_title} 的 total_duration 计算成功: {duration} 秒"
+                    )
             else:
-                logger.warning(f"播客 {cleaned_title} 缺少 sha256 字段，无法构造MP3 URL。")
+                logger.warning(
+                    f"播客 {cleaned_title} 缺少 sha256 字段，无法构造MP3 URL。"
+                )
 
     # 在所有数据处理完成后，再执行删除小于2分钟时长的逻辑
     if DELETE_SHORT_AUDIO:
         original_count = len(data["podcasts"])
         data["podcasts"] = [
-            p for p in data["podcasts"]
-            if p.get("total_duration", 0) >= 120
+            p for p in data["podcasts"] if p.get("total_duration", 0) >= 120
         ]
         new_count = len(data["podcasts"])
         logging.info(f"已删除小于2分钟时长的播客 {original_count - new_count} 个。")
@@ -257,6 +284,7 @@ def main():
     with open("list_to_wash_processed.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
     logging.info("处理完成，已保存到 list_to_wash_processed.json")
+
 
 if __name__ == "__main__":
     main()
