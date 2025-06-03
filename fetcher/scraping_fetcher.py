@@ -28,7 +28,6 @@ def fetch_articles_by_scraping(news_websites_scraping: dict):
     for url in news_websites_scraping:
         try:
             logger.info(f"[Scraping] Fetching URL: {url}")
-            # scrape_result = app.scrape_url(url, formats=["markdown", "html"], wait_for=wait_ms, timeout=timeout_ms)
 
             scrape_result = app.scrape_url(
                 url,		
